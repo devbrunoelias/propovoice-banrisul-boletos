@@ -51,10 +51,91 @@ class PBB_Admin
     }
 
     public static function render_boleto_shortcode($atts = []): string
-    {
-        return '<div class="banrisul-boleto">Shortcode Banrisul funcionando.
-    </div>';
+{
+    $invoice_id = isset($_GET['invoice_id']) ? absint($_GET['invoice_id']) : 0;
+    $token = isset($_GET['token']) ? sanitize_text_field(wp_unslash($_GET['token'])) : '';
+
+    if (!$invoice_id || !$token) {
+        return '<div class="banrisul-boleto"><p>Boleto não localizado. Parâmetros ausentes.</p></div>';
     }
+
+    try {
+        $repo = new PBB_Boletos_Repository();
+        $boleto = $repo->get_by_invoice_id($invoice_id);
+
+        if (!$boleto) {
+            return '<div class="banrisul-boleto"><p>Boleto não encontrado para esta invoice.</p></div>';
+        }
+
+        if (empty($boleto['propovoice_invoice_token']) || !hash_equals((string) $boleto['propovoice_invoice_token'], $token)) {
+            return '<div class="banrisul-boleto"><p>Token inválido para acessar este boleto.</p></div>';
+        }
+
+        $linha_digitavel = esc_html($boleto['linha_digitavel'] ?? '');
+        $pdf_url = esc_url($boleto['pdf_url'] ?? '');
+        $invoice_num = esc_html($boleto['propovoice_invoice_num'] ?? '');
+        $client_name = esc_html($boleto['client_name'] ?? '');
+        $valor = esc_html($boleto['valor_nominal'] ?? '');
+        $vencimento = esc_html($boleto['data_vencimento'] ?? '');
+        $status = esc_html($boleto['status_local'] ?? '');
+
+        ob_start();
+        ?>
+        <div class="banrisul-boleto" style="max-width: 760px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
+            <h2 style="margin-top: 0;">Boleto Banrisul</h2>
+
+            <p><strong>Invoice:</strong> <?php echo $invoice_num; ?></p>
+            <p><strong>Cliente:</strong> <?php echo $client_name; ?></p>
+            <p><strong>Valor:</strong> R$ <?php echo $valor; ?></p>
+            <p><strong>Vencimento:</strong> <?php echo $vencimento; ?></p>
+            <p><strong>Status:</strong> <?php echo $status; ?></p>
+
+            <hr>
+
+            <p><strong>Linha digitável:</strong></p>
+
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <input
+                    type="text"
+                    id="banrisul-linha-digitavel"
+                    value="<?php echo esc_attr($boleto['linha_digitavel'] ?? ''); ?>"
+                    readonly
+                    style="flex: 1; min-width: 280px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                >
+
+                <button
+                    type="button"
+                    onclick="navigator.clipboard.writeText(document.getElementById('banrisul-linha-digitavel').value); alert('Linha digitável copiada!');"
+                    style="padding: 10px 14px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer;"
+                >
+                    Copiar
+                </button>
+            </div>
+
+            <?php if (!empty($pdf_url)) : ?>
+                <p style="margin-top: 20px;">
+                    <a href="<?php echo $pdf_url; ?>" target="_blank" rel="noopener" style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #111827; color: #fff; text-decoration: none;">
+                        Abrir PDF do boleto
+                    </a>
+                </p>
+            <?php else : ?>
+                <p style="margin-top: 20px;">PDF ainda não disponível para este boleto.</p>
+            <?php endif; ?>
+
+            <?php if ($status === 'boleto_sandbox_pdf_exemplo') : ?>
+                <p style="margin-top: 16px; color: #92400e; background: #fffbeb; padding: 10px; border-radius: 6px;">
+                    Ambiente sandbox: o PDF exibido é um boleto exemplo do Banrisul.
+                </p>
+            <?php endif; ?>
+        </div>
+        <?php
+
+        return ob_get_clean();
+
+    } catch (Throwable $e) {
+        return '<div class="banrisul-boleto"><p>Erro ao carregar boleto: ' . esc_html($e->getMessage()) . '</p></div>';
+    }
+}
 
     public static function render_settings_page(): void
 {
@@ -271,7 +352,7 @@ class PBB_Admin
 
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <?php wp_nonce_field('pbb_generate_boleto'); ?>
-            <input type="hidden" name="action" value="pbb_generate_boleto">
+        <input type="hidden" name="action" value="pbb_generate_boleto">
 
             <table class="form-table">
                 <tr>
@@ -302,32 +383,66 @@ class PBB_Admin
                     <th>Nosso número</th>
                     <th>Linha digitável</th>
                     <th>PDF</th>
+                    <th>Link público</th>
                     <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($boletos)) : ?>
                     <tr>
-                        <td colspan="8">Nenhum boleto gerado ainda.</td>
+                        <td colspan="9">Nenhum boleto gerado ainda.</td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ($boletos as $boleto) : ?>
+                        <?php
+                        $link_publico = '';
+                     
+                        if (!empty($boleto['propovoice_invoice_id']) && !empty($boleto['propovoice_invoice_token'])) {
+                            $link_publico = add_query_arg(
+                                [
+                                    'invoice_id' => $boleto['propovoice_invoice_id'],
+                                    'token' => $boleto['propovoice_invoice_token'],
+                                ],
+                                site_url('/banrisul-boleto/')
+                            );
+                        }
+                        ?>
                         <tr>
                             <td><?php echo esc_html($boleto['propovoice_invoice_num']); ?></td>
                             <td><?php echo esc_html($boleto['client_name']); ?></td>
                             <td><?php echo esc_html($boleto['valor_nominal']); ?></td>
                             <td><?php echo esc_html($boleto['data_vencimento']); ?></td>
                             <td><?php echo esc_html($boleto['nosso_numero']); ?></td>
+                            
                             <td style="max-width: 280px; word-break: break-all;">
                                 <?php echo esc_html($boleto['linha_digitavel']); ?>
                             </td>
+
                             <td>
                                 <?php if (!empty($boleto['pdf_url'])) : ?>
-                                <a href="<?php echo esc_url($boleto['pdf_url']); ?>" target="_blank" rel="noopener">Abrir PDF</a>
+                                    <a href="<?php echo esc_url($boleto['pdf_url']); ?>" target="_blank" rel="noopener">Abrir PDF</a>
                                 <?php else : ?>
                                     -
                                 <?php endif; ?>
                             </td>
+                                        
+                            <td>
+                                <?php if (!empty($link_publico)) : ?>
+                                    <a href="<?php echo esc_url($link_publico); ?>" target="_blank" rel="noopener">Abrir página</a>
+                                    <br>
+                                    <button
+                                        type="button"
+                                        onclick="navigator.clipboard.writeText('<?php echo esc_js($link_publico); ?>'); alert('Link público copiado!');"
+                                        class="button button-small"
+                                        style="margin-top: 6px;"
+                                    >
+                                        Copiar link
+                                    </button>
+                                <?php else : ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
+
                             <td><?php echo esc_html($boleto['status_local']); ?></td>
                         </tr>
                     <?php endforeach; ?>
