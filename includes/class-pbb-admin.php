@@ -11,6 +11,7 @@ class PBB_Admin
         add_action('admin_menu', [__CLASS__, 'register_menu']);
         add_action('admin_post_pbb_save_settings', [__CLASS__, 'handle_save_settings']);
         add_action('admin_post_pbb_generate_boleto', [__CLASS__, 'handle_generate_boleto']);
+        add_action('init', [__CLASS__, 'register_shortcodes']);
     }
 
     public static function register_menu(): void
@@ -42,6 +43,17 @@ class PBB_Admin
             'pbb-generate',
             [__CLASS__, 'render_generate_page']
         );
+    }
+
+    public static function register_shortcodes(): void
+    {
+        add_shortcode('banrisul_boleto', [__CLASS__, 'render_boleto_shortcode']);
+    }
+
+    public static function render_boleto_shortcode($atts = []): string
+    {
+        return '<div class="banrisul-boleto">Shortcode Banrisul funcionando.
+    </div>';
     }
 
     public static function render_settings_page(): void
