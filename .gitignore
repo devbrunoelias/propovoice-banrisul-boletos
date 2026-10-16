@@ -1,0 +1,53 @@
+# WordPress real
+wp-config.php
+**/wp-config.php
+wp-config-*.php
+**/wp-config-*.php
+
+# Permitir modelos sanitizados
+!**/*.example.php
+
+# Segredos e ambientes
+.env
+.env.*
+!.env.example
+
+# Chaves e certificados
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Bancos, backups e compactados
+*.sql
+*.db
+*.sqlite
+*.bak
+*.old
+*.orig
+*.zip
+*.rar
+*.7z
+
+# Logs
+*.log
+debug.log
+
+# Arquivos locais de editor e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dependências e artefatos locais
+node_modules/
+vendor/
+
+# Documentos reais gerados
+*.pdf
+
+# Uploads reais do plugin
+banrisul-boletos/
+notas-fiscais/
