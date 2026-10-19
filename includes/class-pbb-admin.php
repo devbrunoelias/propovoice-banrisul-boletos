@@ -111,7 +111,7 @@ class PBB_Admin
                     admin_url('admin-post.php')
                 );
             }
-                
+
             $status_raw = (string)($boleto['status_local'] ?? '');
 
             ob_start();
@@ -152,7 +152,7 @@ class PBB_Admin
                                     $boleto['data_pagamento']
                                 )
                             );
-                            ?>
+                        ?>
                         </p>
                     <?php endif; ?>
 
@@ -160,12 +160,12 @@ class PBB_Admin
                         <p>
                             <strong>Valor pago:</strong>
                             <?php
-                            echo esc_html(
-                                self::format_money_display(
-                                    $boleto['valor_pagamento']
-                                )
-                            );
-                            ?>
+                        echo esc_html(
+                            self::format_money_display(
+                                $boleto['valor_pagamento']
+                            )
+                        );
+                        ?>
                         </p>
                     <?php endif; ?>
 
@@ -173,12 +173,12 @@ class PBB_Admin
                         <p>
                             <strong>Data do crédito:</strong>
                             <?php
-                            echo esc_html(
-                                self::format_date_display(
-                                    $boleto['data_credito']
-                                )
-                            );
-                            ?>
+                        echo esc_html(
+                            self::format_date_display(
+                                $boleto['data_credito']
+                            )
+                        );
+                        ?>
                         </p>
                     <?php endif; ?>
                 </div>
@@ -294,7 +294,7 @@ class PBB_Admin
                                 class="regular-text"
                                 value="<?php
                                     echo esc_attr($producao_oauth_url);
-                                ?>"
+        ?>"
                             >
 
                             <p class="description">
@@ -318,8 +318,8 @@ class PBB_Admin
                                 id="pbb_banrisul_producao_base_url"
                                 class="regular-text"
                                 value="<?php
-                                    echo esc_attr($producao_base_url);
-                                ?>"
+            echo esc_attr($producao_base_url);
+        ?>"
                             >
 
                             <p class="description">
@@ -336,34 +336,34 @@ class PBB_Admin
                         <th scope="row">Credenciais</th>
                         <td>
                             <?php
-                                $banrisul_configurado = false;
-                                $empresa_1_configurada = false;
-                                $empresa_2_configurada = false;
+        $banrisul_configurado = false;
+        $empresa_1_configurada = false;
+        $empresa_2_configurada = false;
 
-                                if ($ambiente === 'sandbox') {
-                                    $banrisul_configurado =
-                                        defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
-                                        && PBB_BANRISUL_SANDBOX_CLIENT_ID !== ''
-                                        && defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
-                                        && PBB_BANRISUL_SANDBOX_CLIENT_SECRET !== '';
-                                } else {
-                                    $empresa_1_configurada =
-                                        defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_ID')
-                                        && PBB_EMPRESA_1_PRODUCAO_CLIENT_ID !== ''
-                                        && defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET')
-                                        && PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET !== '';
+        if ($ambiente === 'sandbox') {
+            $banrisul_configurado =
+                defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
+                && PBB_BANRISUL_SANDBOX_CLIENT_ID !== ''
+                && defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
+                && PBB_BANRISUL_SANDBOX_CLIENT_SECRET !== '';
+        } else {
+            $empresa_1_configurada =
+                defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_ID')
+                && PBB_EMPRESA_1_PRODUCAO_CLIENT_ID !== ''
+                && defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET')
+                && PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET !== '';
 
-                                    $empresa_2_configurada =
-                                        defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_ID')
-                                        && PBB_EMPRESA_2_PRODUCAO_CLIENT_ID !== ''
-                                        && defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET')
-                                        && PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET !== '';
+            $empresa_2_configurada =
+                defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_ID')
+                && PBB_EMPRESA_2_PRODUCAO_CLIENT_ID !== ''
+                && defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET')
+                && PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET !== '';
 
-                                    $banrisul_configurado =
-                                        $empresa_1_configurada
-                                        && $empresa_2_configurada;
-                                }
-                            ?>
+            $banrisul_configurado =
+                $empresa_1_configurada
+                && $empresa_2_configurada;
+        }
+        ?>
 
                             <?php if ($banrisul_configurado) : ?>
                                 <strong style="color: #008a20;">
@@ -397,12 +397,12 @@ class PBB_Admin
                         <th scope="row">Credenciais</th>
                         <td>
                             <?php
-                            $propovoice_configurado =
-                                defined('PBB_PROPOVOICE_USERNAME')
-                                && PBB_PROPOVOICE_USERNAME !== ''
-                                && defined('PBB_PROPOVOICE_APP_PASSWORD')
-                                && PBB_PROPOVOICE_APP_PASSWORD !== '';
-                            ?>
+        $propovoice_configurado =
+            defined('PBB_PROPOVOICE_USERNAME')
+            && PBB_PROPOVOICE_USERNAME !== ''
+            && defined('PBB_PROPOVOICE_APP_PASSWORD')
+            && PBB_PROPOVOICE_APP_PASSWORD !== '';
+        ?>
 
                             <?php if ($propovoice_configurado) : ?>
                                 <strong style="color: #008a20;">
@@ -459,10 +459,12 @@ class PBB_Admin
 
         $ambientes_permitidos = ['sandbox', 'homologacao', 'producao',];
 
-        if (!in_array($ambiente, $ambientes_permitidos, true)) {$ambiente = 'sandbox';}
+        if (!in_array($ambiente, $ambientes_permitidos, true)) {
+            $ambiente = 'sandbox';
+        }
 
         update_option('pbb_banrisul_ambiente', $ambiente);
-        
+
         update_option('pbb_banrisul_oauth_url', esc_url_raw($_POST['pbb_banrisul_oauth_url'] ?? ''));
         update_option('pbb_banrisul_base_url', esc_url_raw($_POST['pbb_banrisul_base_url'] ?? ''));
         update_option('pbb_banrisul_beneficiario', sanitize_text_field($_POST['pbb_banrisul_beneficiario'] ?? ''));
@@ -538,11 +540,15 @@ class PBB_Admin
                     </tr>
                     <tr>
                         <th scope="row">
-                            <label for="invoice_id">ID da Invoice PROPOVOICE</label>
+                            <label for="invoice_id">Número ou ID da Invoice PROPOVOICE</label>
                         </th>
                         <td>
                             <input type="number" name="invoice_id" id="invoice_id" class="regular-text" required>
-                            <p class="description">Exemplo do seu teste: 2296.</p>
+                            <p class="description">
+                                Informe somente a parte numérica.
+                                Exemplo: para Inv-2298, informe 2298.
+                                Exemplo de teste: 2296.
+                            </p>
                         </td>
                     </tr>
                 </table>
@@ -554,6 +560,18 @@ class PBB_Admin
 
             <h2>Últimos boletos gerados</h2>
 
+             <style>
+                .widefat tr.pbb-boleto-pago > td {
+                    background-color: #d7f0dc !important;
+                    border-top-color: #9dccaa;
+                    border-bottom-color: #9dccaa;
+                }
+
+                .widefat tr.pbb-boleto-pago > td:first-child {
+                    border-left: 4px solid #008a20;
+                }
+            </style>
+                   
             <table class="widefat striped">
                 <thead>
                     <tr>
@@ -578,7 +596,7 @@ class PBB_Admin
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
                             $link_publico = '';
-                            
+
                             if (!empty($boleto['propovoice_invoice_id'])
                                 && !empty($boleto['propovoice_invoice_token'])
                             ) {
@@ -638,20 +656,25 @@ class PBB_Admin
                                 );
                             }
 
+                            $row_class = (
+                                ($boleto['status_local'] ?? '') === 'pago'
+                            )
+                                ? 'pbb-boleto-pago'
+                                : '';
                             ?>
-                            <tr>
+                            <tr class="<?php echo esc_attr($row_class); ?>">
                                 <td><?php echo esc_html($boleto['propovoice_invoice_num']); ?></td>
                                 <td><?php echo esc_html($empresa_nome); ?>
                                     <?php
                                         if (!empty($boleto['beneficiario_codigo'])) :
-                                    ?>
+                                            ?>
                                     <br>
                                         <small>
                                             Beneficiário:
                                             <?php
-                                            echo esc_html(
-                                                $boleto['beneficiario_codigo']
-                                            );
+                                                    echo esc_html(
+                                                        $boleto['beneficiario_codigo']
+                                                    );
                                             ?>
                                         </small>
                                     <?php endif; ?>
@@ -749,11 +772,12 @@ class PBB_Admin
         if (!$invoice_id) {
             self::set_notice(
                 'Informe um ID de invoice válido.',
-                'error');
+                'error'
+            );
 
             wp_safe_redirect(
                 admin_url('admin.php?page=pbb-generate')
-                );
+            );
             exit;
         }
 
@@ -790,7 +814,11 @@ class PBB_Admin
             $boleto_existente = $repo->get_by_invoice_id($invoice_id);
 
             if (
-                $ambiente === 'producao'
+                in_array(
+                    $ambiente,
+                    ['homologacao', 'producao'],
+                    true
+                )
                 && !empty($boleto_existente['codigo_barras'])
             ) {
                 self::set_notice(
@@ -805,7 +833,7 @@ class PBB_Admin
 
                 exit;
             }
-            
+
             $invoices_response = $propovoice->list_invoices();
             $invoice = self::find_invoice_by_id($invoices_response, $invoice_id);
 
@@ -919,86 +947,86 @@ class PBB_Admin
 
     public static function handle_consultar_status(): void
     {
-    if (!current_user_can('manage_options')) {
-        wp_die('Sem permissão.');
-    }
-
-    $boleto_id = absint($_POST['boleto_id'] ?? 0);
-
-    if (!$boleto_id) {
-        self::set_notice('Boleto inválido para consulta.', 'error');
-        wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
-        exit;
-    }
-
-    check_admin_referer('pbb_consultar_status_' . $boleto_id);
-
-    try {
-        $repo = new PBB_Boletos_Repository();
-        $boleto = $repo->get_by_id($boleto_id);
-
-        if (!$boleto) {
-            throw new Exception('Boleto não encontrado no banco de dados.');
+        if (!current_user_can('manage_options')) {
+            wp_die('Sem permissão.');
         }
 
-        if (empty($boleto['codigo_barras'])) {
-            throw new Exception('Boleto sem código de barras para consulta.');
+        $boleto_id = absint($_POST['boleto_id'] ?? 0);
+
+        if (!$boleto_id) {
+            self::set_notice('Boleto inválido para consulta.', 'error');
+            wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
+            exit;
         }
 
-        $ambiente = (string)get_option('pbb_banrisul_ambiente', 'sandbox');
+        check_admin_referer('pbb_consultar_status_' . $boleto_id);
 
-        $empresa_id = sanitize_key((string)($boleto['empresa_id'] ?? ''));
+        try {
+            $repo = new PBB_Boletos_Repository();
+            $boleto = $repo->get_by_id($boleto_id);
 
-        if ($empresa_id === '') {
-            if ($ambiente === 'sandbox') {
-                $empresa_id = 'empresa_1';
-            } else {
+            if (!$boleto) {
+                throw new Exception('Boleto não encontrado no banco de dados.');
+            }
+
+            if (empty($boleto['codigo_barras'])) {
+                throw new Exception('Boleto sem código de barras para consulta.');
+            }
+
+            $ambiente = (string)get_option('pbb_banrisul_ambiente', 'sandbox');
+
+            $empresa_id = sanitize_key((string)($boleto['empresa_id'] ?? ''));
+
+            if ($empresa_id === '') {
+                if ($ambiente === 'sandbox') {
+                    $empresa_id = 'empresa_1';
+                } else {
+                    throw new Exception(
+                        'O boleto não possui empresa emissora vinculada.'
+                    );
+                }
+            }
+
+            if (!PBB_Empresas_Config::exists($empresa_id)) {
                 throw new Exception(
-                    'O boleto não possui empresa emissora vinculada.'
+                    'A empresa emissora vinculada ao boleto é inválida.'
                 );
             }
-        }
 
-        if (!PBB_Empresas_Config::exists($empresa_id)) {
-            throw new Exception(
-                'A empresa emissora vinculada ao boleto é inválida.'
+            $banrisul = new PBB_Banrisul_API($empresa_id);
+
+            if ($ambiente === 'sandbox') {
+                $codigo_consulta = '04191861100000150502100100000010000000024047';
+            } else {
+                $codigo_consulta = (string) $boleto['codigo_barras'];
+            }
+
+            $consulta = $banrisul->consultar_boleto_por_codigo_barras(
+                $codigo_consulta
             );
-        }
 
-        $banrisul = new PBB_Banrisul_API($empresa_id);
+            $repo->update_status_from_consulta($boleto_id, $consulta);
 
-        if ($ambiente === 'sandbox') {
-            $codigo_consulta = '04191861100000150502100100000010000000024047';
-        } else {
-            $codigo_consulta = (string) $boleto['codigo_barras'];
-        }
-
-        $consulta = $banrisul->consultar_boleto_por_codigo_barras(
-            $codigo_consulta
-        );
-
-        $repo->update_status_from_consulta($boleto_id, $consulta);
-
-        if ($ambiente === 'sandbox') {
+            if ($ambiente === 'sandbox') {
+                self::set_notice(
+                    'Consulta sandbox realizada usando o título exemplo do Banrisul.',
+                    'success'
+                );
+            } else {
+                self::set_notice(
+                    'Status do boleto consultado com sucesso.',
+                    'success'
+                );
+            }
+        } catch (Throwable $e) {
             self::set_notice(
-                'Consulta sandbox realizada usando o título exemplo do Banrisul.',
-                'success'
-            );
-        } else {
-            self::set_notice(
-                'Status do boleto consultado com sucesso.',
-                'success'
+                'Erro ao consultar status: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine(),
+                'error'
             );
         }
-    } catch (Throwable $e) {
-        self::set_notice(
-            'Erro ao consultar status: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine(),
-            'error'
-        );
-    }
 
-    wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
-    exit;
+        wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
+        exit;
     }
 
     public static function handle_download_boleto(): void
@@ -1086,7 +1114,7 @@ class PBB_Admin
         }
 
         $nome_download = 'boleto-' . sanitize_file_name(
-                (string)($boleto['nosso_numero'] ?? $invoice_id)
+            (string)($boleto['nosso_numero'] ?? $invoice_id)
         )
         . '.pdf';
 
@@ -1108,14 +1136,49 @@ class PBB_Admin
         exit;
     }
 
-    private static function find_invoice_by_id(array $response, int $invoice_id): ?array
-    {
+    private static function find_invoice_by_id(
+        array $response,
+        int $invoice_id
+    ): ?array {
         $items = $response['data']['result'] ?? [];
+
+        if (!is_array($items)) {
+            return null;
+        }
+
+        /*
+         * Primeiro procura pelo número visual da invoice.
+         *
+         * Exemplo:
+         * Inv-2298 → 2298
+         */
         foreach ($items as $item) {
-            if ((int)($item['id'] ?? 0) === $invoice_id) {
+            $invoice_numero = self::only_digits(
+                (string)($item['num'] ?? '')
+            );
+
+            if (
+                $invoice_numero !== ''
+                && (int)$invoice_numero === $invoice_id
+            ) {
                 return $item;
             }
         }
+
+        /*
+         * Se não encontrar pelo número visual,
+         * procura pelo ID interno para manter
+         * compatibilidade com os testes anteriores.
+         */
+        foreach ($items as $item) {
+            if (
+                (int)($item['id'] ?? 0)
+                === $invoice_id
+            ) {
+                return $item;
+            }
+        }
+
         return null;
     }
 
@@ -1289,7 +1352,7 @@ class PBB_Admin
         }
 
         $dir = trailingslashit($upload['basedir']) . 'banrisul-boletos';
-        
+
         self::ensure_protected_dir($dir);
 
         $filename = 'boleto-' . sanitize_file_name($nosso_numero ?: uniqid('boleto-', true)) . '.pdf';
@@ -1313,20 +1376,20 @@ class PBB_Admin
 
     private static function format_date_display(?string $date): string
     {
-    if (empty($date)) {
-        return '';
-    }
+        if (empty($date)) {
+            return '';
+        }
 
-    $date_object = DateTimeImmutable::createFromFormat(
-        '!Y-m-d',
-        $date
-    );
+        $date_object = DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $date
+        );
 
-    if (!$date_object) {
-        return '';
-    }
+        if (!$date_object) {
+            return '';
+        }
 
-    return $date_object->format('d/m/Y');
+        return $date_object->format('d/m/Y');
     }
 
     private static function format_money_display($value): string
@@ -1340,17 +1403,28 @@ class PBB_Admin
 
     private static function format_status(string $status): string
     {
-    $labels = [
-        'aguardando_pagamento' => 'Aguardando pagamento',
-        'rejeitado_cip' => 'Boleto rejeitado',
-        'baixado' => 'Boleto baixado',
-        'boleto_gerado' => 'Boleto gerado',
-        'boleto_registrado_sem_pdf' => 'Boleto registrado, PDF indisponível',
-        'boleto_sandbox_pdf_exemplo' => 'Ambiente de teste',
-        'pago' => 'Pago',
-    ];
+        $labels = [
+            'aguardando_pagamento' => 'Aguardando pagamento',
+            'rejeitado_cip' => 'Boleto rejeitado',
+            'baixado' => 'Boleto baixado',
+            'boleto_gerado' => 'Boleto gerado',
+            'boleto_registrado_sem_pdf' => 'Boleto registrado, PDF indisponível',
+            'boleto_sandbox_pdf_exemplo' => 'Ambiente de teste',
+            'pago' => 'Pago',
+            'pagamento_identificado' => 'Pagamento identificado',
+            'credito_retido' => 'Pagamento identificado, crédito retido',
+            'baixado_pagamento' => 'Baixado por pagamento',
+            'baixado_devolucao' => 'Baixado por devolução',
+            'reembolsado' => 'Reembolsado',
+            'transferido_cl' => 'Transferido para cobrança',
+            'protestado' => 'Protestado',
+            'baixado_no_dia' => 'Baixado no dia',
+            'devolucao_automatica' => 'Em processo de devolução automática',
+            'em_cartorio' => 'Em cartório',
+            'negativado' => 'Negativado e apto para pagamento',
+        ];
 
-    return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
+        return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 
     private static function render_environment_notice(): void

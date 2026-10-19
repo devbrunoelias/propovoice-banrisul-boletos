@@ -14,8 +14,8 @@ class PBB_Activator
         $charset_collate = $wpdb->get_charset_collate();
 
         $sql = "CREATE TABLE {$table} (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            propovoice_invoice_id BIGINT UNSIGNED NOT NULL,
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, 
+            propovoice_invoice_id BIGINT UNSIGNED NOT NULL, 
             propovoice_invoice_num VARCHAR(50) NOT NULL,
             propovoice_invoice_token VARCHAR(120) NULL,
             propovoice_contact_id BIGINT UNSIGNED NULL,

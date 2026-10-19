@@ -185,68 +185,121 @@ class PBB_Boletos_Repository
         $titulo = $consulta['titulo'] ?? [];
         $operacoes = is_array($titulo['operacoes'] ?? null)
             ? $titulo['operacoes']
-            : []; 
+            : [];
 
         $row = [
             'situacao_banrisul' => sanitize_text_field((string)($titulo['situacao_banrisul'] ?? '')),
             'situacao_cip' => sanitize_text_field((string)($titulo['situacao_cip'] ?? '')),
             'situacao_pagamento' => sanitize_text_field(
                 (string) ($titulo['situacao_pagamento'] ?? '')
-                ),
+            ),
 
             'payload_consulta' => $this->json_or_null($consulta),
             'updated_at' => current_time('mysql'),
         ];
 
-            if (!empty($operacoes['data_pagamento'])) {
-                $row['data_pagamento'] = sanitize_text_field(
-                    (string)$operacoes['data_pagamento']
-                );
-            }
+        if (!empty($operacoes['data_pagamento'])) {
+            $row['data_pagamento'] = sanitize_text_field(
+                (string)$operacoes['data_pagamento']
+            );
+        }
 
-            if (!empty($operacoes['data_credito'])) {
-                $row['data_credito'] = sanitize_text_field(
-                    (string)$operacoes['data_credito']
-                );
-            }
+        if (!empty($operacoes['data_credito'])) {
+            $row['data_credito'] = sanitize_text_field(
+                (string)$operacoes['data_credito']
+            );
+        }
 
-            if (
-                isset($operacoes['valor_pagamento'])
-                && $operacoes['valor_pagamento'] !== ''
-            ) {
-                $row['valor_pagamento'] = (float)$operacoes['valor_pagamento'];
-            }
+        if (
+            isset($operacoes['valor_pagamento'])
+            && $operacoes['valor_pagamento'] !== ''
+        ) {
+            $row['valor_pagamento'] = (float)$operacoes['valor_pagamento'];
+        }
 
-            if (
-                isset($operacoes['valor_cobrado'])
-                && $operacoes['valor_cobrado'] !== ''
-            ) {
-                $row['valor_cobrado'] = (float)$operacoes['valor_cobrado'];
-            }
+        if (
+            isset($operacoes['valor_cobrado'])
+            && $operacoes['valor_cobrado'] !== ''
+        ) {
+            $row['valor_cobrado'] = (float)$operacoes['valor_cobrado'];
+        }
 
-            if (
-                isset($operacoes['valor_creditado_debitado'])
-                && $operacoes['valor_creditado_debitado'] !== ''
-            ) {
-                $row['valor_creditado_debitado'] =
-                    (float)$operacoes['valor_creditado_debitado'];
-            }
+        if (
+            isset($operacoes['valor_creditado_debitado'])
+            && $operacoes['valor_creditado_debitado'] !== ''
+        ) {
+            $row['valor_creditado_debitado'] =
+                (float)$operacoes['valor_creditado_debitado'];
+        }
 
-            if (($titulo['situacao_banrisul'] ?? '') === 'L') {
-                $row['status_local'] = 'pago';
+        $situacao_banrisul = (string)(
+            $titulo['situacao_banrisul'] ?? ''
+        );
 
-            } elseif (($titulo['situacao_cip'] ?? '') === 'R') {
-                $row['status_local'] = 'rejeitado_cip';
+        $situacao_cip = (string)(
+            $titulo['situacao_cip'] ?? ''
+        );
 
-            } elseif (
-                ($titulo['situacao_banrisul'] ?? '') === 'A'
-                && ($titulo['situacao_cip'] ?? '') === 'A'
-            ) {
-                $row['status_local'] = 'aguardando_pagamento';
+        $situacao_pagamento = (string)(
+            $titulo['situacao_pagamento'] ?? ''
+        );
 
-            } elseif (($titulo['situacao_banrisul'] ?? '') === 'B') {
-                $row['status_local'] = 'baixado';
-            }
+        $pagamento_confirmado =
+            !empty($operacoes['data_pagamento'])
+            && isset($operacoes['valor_pagamento'])
+            && (float)$operacoes['valor_pagamento'] > 0;
+
+        if ($situacao_banrisul === 'L') {
+            $row['status_local'] = 'pago';
+
+        } elseif ($situacao_pagamento === '3') {
+            $row['status_local'] = 'credito_retido';
+
+        } elseif (
+            $situacao_pagamento === '2'
+            || (
+                $pagamento_confirmado
+                && $situacao_pagamento === ''
+            )
+        ) {
+            $row['status_local'] = 'pagamento_identificado';
+
+        } elseif ($situacao_cip === 'R') {
+            $row['status_local'] = 'rejeitado_cip';
+
+        } elseif ($situacao_banrisul === 'B') {
+            $row['status_local'] = 'baixado_pagamento';
+
+        } elseif ($situacao_banrisul === 'D') {
+            $row['status_local'] = 'baixado_devolucao';
+
+        } elseif ($situacao_banrisul === 'R') {
+            $row['status_local'] = 'reembolsado';
+
+        } elseif ($situacao_banrisul === 'T') {
+            $row['status_local'] = 'transferido_cl';
+
+        } elseif ($situacao_banrisul === 'P') {
+            $row['status_local'] = 'protestado';
+
+        } elseif ($situacao_pagamento === '4') {
+            $row['status_local'] = 'baixado_no_dia';
+
+        } elseif ($situacao_pagamento === '5') {
+            $row['status_local'] = 'devolucao_automatica';
+
+        } elseif ($situacao_pagamento === '6') {
+            $row['status_local'] = 'em_cartorio';
+
+        } elseif ($situacao_pagamento === '8') {
+            $row['status_local'] = 'negativado';
+
+        } elseif (
+            $situacao_banrisul === 'A'
+            && $situacao_cip === 'A'
+        ) {
+            $row['status_local'] = 'aguardando_pagamento';
+        }
 
         $updated = $wpdb->update(
             $this->table,
@@ -272,12 +325,12 @@ class PBB_Boletos_Repository
 
     public function list_for_status_sync(int $limit = 50): array
     {
-    global $wpdb;
+        global $wpdb;
 
-    $limit = max(1, min(100, $limit));
+        $limit = max(1, min(100, $limit));
 
-    $sql = $wpdb->prepare(
-        "SELECT *
+        $sql = $wpdb->prepare(
+            "SELECT *
         FROM {$this->table}
         WHERE status_local IN (
             'boleto_gerado',
@@ -287,11 +340,97 @@ class PBB_Boletos_Repository
         AND codigo_barras <> ''
         ORDER BY updated_at ASC
         LIMIT %d",
-        $limit
-    );
+            $limit
+        );
 
-    $rows = $wpdb->get_results($sql, ARRAY_A);
+        $rows = $wpdb->get_results($sql, ARRAY_A);
 
-    return is_array($rows) ? $rows : [];
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function find_for_webhook(
+        string $beneficiario_codigo,
+        string $nosso_numero,
+        string $codigo_barras,
+        string $linha_digitavel
+    ): ?array {
+        global $wpdb;
+
+        $beneficiario_codigo = preg_replace(
+            '/\D+/',
+            '',
+            $beneficiario_codigo
+        );
+
+        $nosso_numero = preg_replace(
+            '/\D+/',
+            '',
+            $nosso_numero
+        );
+
+        $codigo_barras = preg_replace(
+            '/\D+/',
+            '',
+            $codigo_barras
+        );
+
+        $linha_digitavel = preg_replace(
+            '/\D+/',
+            '',
+            $linha_digitavel
+        );
+
+        if ($beneficiario_codigo === '') {
+            return null;
+        }
+
+        $conditions = [];
+        $values = [
+            $beneficiario_codigo,
+        ];
+
+        if ($codigo_barras !== '') {
+            $conditions[] = 'codigo_barras = %s';
+            $values[] = $codigo_barras;
+        }
+
+        if ($linha_digitavel !== '') {
+            $conditions[] = 'linha_digitavel = %s';
+            $values[] = $linha_digitavel;
+        }
+
+        if ($nosso_numero !== '') {
+            $conditions[] = 'nosso_numero = %s';
+            $values[] = $nosso_numero;
+        }
+
+        if ($conditions === []) {
+            return null;
+        }
+
+        $sql = "
+            SELECT *
+            FROM {$this->table}
+            WHERE beneficiario_codigo = %s
+            AND (
+                " . implode(' OR ', $conditions) . "
+            )
+            ORDER BY id DESC
+            LIMIT 1
+        ";
+
+        $prepared = $wpdb->prepare(
+            $sql,
+            ...$values
+        );
+
+        $result = $wpdb->get_row(
+            $prepared,
+            ARRAY_A
+        );
+
+        return is_array($result)
+            ? $result
+            : null;
     }
 }

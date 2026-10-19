@@ -5,7 +5,12 @@
  * Copie estas constantes para o wp-config.php real da instalação.
  * Nunca preencha credenciais reais neste arquivo versionado.
  */
-define( 'WP_DEBUG', false );
+
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+
+define('PBB_WEBHOOK_ALLOW_TEST_IP', false);
 
 /* Add any custom values between this line and the "stop editing" line. */
 

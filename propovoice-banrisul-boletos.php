@@ -20,6 +20,7 @@ define('PBB_VERSION', '0.1.0');
 
 require_once PBB_DIR . 'includes/class-pbb-activator.php';
 require_once PBB_DIR . 'includes/class-pbb-empresas-config.php';
+require_once PBB_DIR . 'includes/class-pbb-webhook.php';
 require_once PBB_DIR . 'includes/class-pbb-admin.php';
 require_once PBB_DIR . 'includes/class-pbb-propovoice-api.php';
 require_once PBB_DIR . 'includes/class-pbb-banrisul-api.php';
@@ -35,4 +36,5 @@ register_deactivation_hook(__FILE__, function (): void {
 add_action('plugins_loaded', function (): void {
     PBB_Admin::init();
     PBB_Cron::init();
+    PBB_Webhook::init();
 });
