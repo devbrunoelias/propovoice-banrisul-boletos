@@ -11,6 +11,7 @@ class PBB_Admin
         add_action('admin_menu', [__CLASS__, 'register_menu']);
         add_action('admin_post_pbb_save_settings', [__CLASS__, 'handle_save_settings']);
         add_action('admin_post_pbb_generate_boleto', [__CLASS__, 'handle_generate_boleto']);
+        add_action('admin_post_pbb_consultar_status', [__CLASS__, 'handle_consultar_status']);
         add_action('init', [__CLASS__, 'register_shortcodes']);
     }
 
@@ -83,7 +84,7 @@ class PBB_Admin
                 <p><strong>Cliente:</strong> <?php echo esc_html($boleto['client_name'] ?? ''); ?></p>
                 <p><strong>Valor:</strong> R$ <?php echo esc_html($boleto['valor_nominal'] ?? ''); ?></p>
                 <p><strong>Vencimento:</strong> <?php echo esc_html($boleto['data_vencimento'] ?? ''); ?></p>
-                <p><strong>Status:</strong> <?php echo esc_html($status_raw); ?></p>
+                <p><strong>Status:</strong> <?php echo esc_html(self::format_status($status_raw)); ?></p>
 
                 <hr>
 
@@ -311,12 +312,13 @@ class PBB_Admin
                         <th>Linha digitável</th>
                         <th>PDF</th>
                         <th>Link público</th>
+                        <th>Consultar status</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($boletos)) : ?>
-                        <tr><td colspan="9">Nenhum boleto gerado ainda.</td></tr>
+                        <tr><td colspan="10">Nenhum boleto gerado ainda.</td></tr>
                     <?php else : ?>
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
@@ -353,7 +355,26 @@ class PBB_Admin
                                         -
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo esc_html($boleto['status_local']); ?></td>
+
+                                <td>
+                                    <?php if (!empty($boleto['id']) && !empty($boleto['codigo_barras'])) : ?>
+                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" 
+                                            style="margin:0;">
+                                            <?php wp_nonce_field('pbb_consultar_status_' . absint($boleto['id'])); ?>
+                                            <input type="hidden" name="action" value="pbb_consultar_status">
+                                            <input type="hidden" name="boleto_id" value="<?php echo esc_attr(absint($boleto['id'])); ?>">
+                                            <button type="submit" class="button button-small">Consultar</button>
+                                        </form>
+                                    <?php else : ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php echo esc_html(
+                                        self::format_status((string) ($boleto['status_local'] ?? ''))
+                                    ); ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -491,6 +512,71 @@ class PBB_Admin
         wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
         exit;
     }
+
+    public static function handle_consultar_status(): void
+{
+    if (!current_user_can('manage_options')) {
+        wp_die('Sem permissão.');
+    }
+
+    $boleto_id = absint($_POST['boleto_id'] ?? 0);
+
+    if (!$boleto_id) {
+        self::set_notice('Boleto inválido para consulta.', 'error');
+        wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
+        exit;
+    }
+
+    check_admin_referer('pbb_consultar_status_' . $boleto_id);
+
+    try {
+        $repo = new PBB_Boletos_Repository();
+        $boleto = $repo->get_by_id($boleto_id);
+
+        if (!$boleto) {
+            throw new Exception('Boleto não encontrado no banco de dados.');
+        }
+
+        if (empty($boleto['codigo_barras'])) {
+            throw new Exception('Boleto sem código de barras para consulta.');
+        }
+
+        $banrisul = new PBB_Banrisul_API();
+        $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
+
+        if ($ambiente === 'sandbox') {
+            $codigo_consulta = '04191861100000150502100100000010000000024047';
+        } else {
+            $codigo_consulta = (string) $boleto['codigo_barras'];
+        }
+
+        $consulta = $banrisul->consultar_boleto_por_codigo_barras(
+            $codigo_consulta
+        );
+
+        $repo->update_status_from_consulta($boleto_id, $consulta);
+
+        if ($ambiente === 'sandbox') {
+            self::set_notice(
+                'Consulta sandbox realizada usando o título exemplo do Banrisul.',
+                'success'
+            );
+        } else {
+            self::set_notice(
+                'Status do boleto consultado com sucesso.',
+                'success'
+            );
+        }
+    } catch (Throwable $e) {
+        self::set_notice(
+            'Erro ao consultar status: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine(),
+            'error'
+        );
+    }
+
+    wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
+    exit;
+}
 
     private static function find_invoice_by_id(array $response, int $invoice_id): ?array
     {
@@ -644,6 +730,22 @@ class PBB_Admin
             'url' => trailingslashit($upload['baseurl']) . 'banrisul-boletos/' . $filename,
         ];
     }
+
+    private static function format_status(string $status): string
+    {
+    $labels = [
+        'aguardando_pagamento' => 'Aguardando pagamento',
+        'rejeitado_cip' => 'Boleto rejeitado',
+        'baixado' => 'Boleto baixado',
+        'boleto_gerado' => 'Boleto gerado',
+        'boleto_registrado_sem_pdf' => 'Boleto registrado, PDF indisponível',
+        'boleto_sandbox_pdf_exemplo' => 'Ambiente de teste',
+        'pago' => 'Pago',
+    ];
+
+    return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
 
     private static function set_notice(string $message, string $type = 'success'): void
     {

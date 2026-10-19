@@ -46,5 +46,10 @@ class PBB_Activator
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
+
+        if (!wp_next_scheduled(PBB_Cron::HOOK)) {
+            PBB_Cron::schedule();
+        }
+
     }
 }

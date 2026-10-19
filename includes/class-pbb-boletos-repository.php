@@ -137,13 +137,21 @@ class PBB_Boletos_Repository
             'updated_at' => current_time('mysql'),
         ];
 
-        if (($titulo['situacao_cip'] ?? '') === 'R') {
-            $row['status_local'] = 'rejeitado_cip';
-        } elseif (($titulo['situacao_banrisul'] ?? '') === 'A' && ($titulo['situacao_cip'] ?? '') === 'A') {
-            $row['status_local'] = 'aguardando_pagamento';
-        } elseif (($titulo['situacao_banrisul'] ?? '') === 'B') {
-            $row['status_local'] = 'baixado';
-        }
+            if (($titulo['situacao_banrisul'] ?? '') === 'L') {
+                $row['status_local'] = 'pago';
+
+            } elseif (($titulo['situacao_cip'] ?? '') === 'R') {
+                $row['status_local'] = 'rejeitado_cip';
+
+            } elseif (
+                ($titulo['situacao_banrisul'] ?? '') === 'A'
+                && ($titulo['situacao_cip'] ?? '') === 'A'
+            ) {
+                $row['status_local'] = 'aguardando_pagamento';
+
+            } elseif (($titulo['situacao_banrisul'] ?? '') === 'B') {
+                $row['status_local'] = 'baixado';
+            }
 
         $updated = $wpdb->update(
             $this->table,
@@ -165,5 +173,30 @@ class PBB_Boletos_Repository
         }
 
         return wp_json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    public function list_for_status_sync(int $limit = 50): array
+    {
+    global $wpdb;
+
+    $limit = max(1, min(100, $limit));
+
+    $sql = $wpdb->prepare(
+        "SELECT *
+        FROM {$this->table}
+        WHERE status_local IN (
+            'boleto_gerado',
+            'aguardando_pagamento',
+            'boleto_registrado_sem_pdf'
+        )
+        AND codigo_barras <> ''
+        ORDER BY updated_at ASC
+        LIMIT %d",
+        $limit
+    );
+
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+
+    return is_array($rows) ? $rows : [];
     }
 }

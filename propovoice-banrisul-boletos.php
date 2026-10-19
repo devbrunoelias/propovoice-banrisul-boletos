@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Propovoice Banrisul Boletos
  * Description: Integra invoices(Faturas) do PROPOVOICE com a API de Cobrança Banrisul para geração de boletos.
- * Version: 0.2.0
+ * Version: 0.1.0
  * Requires PHP: 8.2
  * Author: Bruno Elias Ferreira
  * License: GPL-2.0-or-later
@@ -23,9 +23,15 @@ require_once PBB_DIR . 'includes/class-pbb-admin.php';
 require_once PBB_DIR . 'includes/class-pbb-propovoice-api.php';
 require_once PBB_DIR . 'includes/class-pbb-banrisul-api.php';
 require_once PBB_DIR . 'includes/class-pbb-boletos-repository.php';
+require_once PBB_DIR . 'includes/class-pbb-cron.php';
 
 register_activation_hook(__FILE__, ['PBB_Activator', 'activate']);
 
+register_deactivation_hook(__FILE__, function (): void {
+    PBB_Cron::unschedule();
+});
+
 add_action('plugins_loaded', function () {
     PBB_Admin::init();
+    PBB_Cron::init();
 });
