@@ -16,9 +16,27 @@ class PBB_Banrisul_API
     {
         $this->base_url = rtrim((string) get_option('pbb_banrisul_base_url'), '/');
         $this->oauth_url = (string) get_option('pbb_banrisul_oauth_url');
-        $this->client_id = (string) get_option('pbb_banrisul_client_id');
-        $this->client_secret = (string) get_option('pbb_banrisul_client_secret');
         $this->beneficiario = (string) get_option('pbb_banrisul_beneficiario');
+        $ambiente = get_option('pbb_banrisul_ambiente','sandbox');
+
+        if ($ambiente === 'producao') {
+            $this->client_id = defined('PBB_BANRISUL_PRODUCAO_CLIENT_ID')
+                ? (string) PBB_BANRISUL_PRODUCAO_CLIENT_ID
+                : '';
+
+            $this->client_secret = defined('PBB_BANRISUL_PRODUCAO_CLIENT_SECRET')
+                ? (string) PBB_BANRISUL_PRODUCAO_CLIENT_SECRET
+                : '';
+        } else {
+            $this->client_id = defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
+                ? (string) PBB_BANRISUL_SANDBOX_CLIENT_ID
+                : '';
+
+            $this->client_secret = defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
+                ? (string) PBB_BANRISUL_SANDBOX_CLIENT_SECRET
+                : '';    
+        }   
+        
     }
 
     private function get_token(): string

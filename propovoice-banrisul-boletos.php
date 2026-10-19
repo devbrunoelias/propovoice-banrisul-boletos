@@ -18,12 +18,12 @@ define('PBB_DIR', plugin_dir_path(__FILE__));
 define('PBB_URL', plugin_dir_url(__FILE__));
 define('PBB_VERSION', '0.1.0');
 
+require_once PBB_DIR . 'includes/class-pbb-cron.php';
 require_once PBB_DIR . 'includes/class-pbb-activator.php';
 require_once PBB_DIR . 'includes/class-pbb-admin.php';
 require_once PBB_DIR . 'includes/class-pbb-propovoice-api.php';
 require_once PBB_DIR . 'includes/class-pbb-banrisul-api.php';
 require_once PBB_DIR . 'includes/class-pbb-boletos-repository.php';
-require_once PBB_DIR . 'includes/class-pbb-cron.php';
 
 register_activation_hook(__FILE__, ['PBB_Activator', 'activate']);
 
@@ -31,7 +31,7 @@ register_deactivation_hook(__FILE__, function (): void {
     PBB_Cron::unschedule();
 });
 
-add_action('plugins_loaded', function () {
+add_action('plugins_loaded', function (): void {
     PBB_Admin::init();
     PBB_Cron::init();
 });

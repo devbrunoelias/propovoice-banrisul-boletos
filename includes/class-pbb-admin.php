@@ -142,11 +142,7 @@ class PBB_Admin
         $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
         $base_url = get_option('pbb_banrisul_base_url', 'https://apidev.banrisul.com.br/cobranca/v1');
         $oauth_url = get_option('pbb_banrisul_oauth_url', '');
-        $client_id = get_option('pbb_banrisul_client_id', '');
-        $client_secret = get_option('pbb_banrisul_client_secret', '');
         $beneficiario = get_option('pbb_banrisul_beneficiario', '0010000001088');
-        $propovoice_username = get_option('pbb_propovoice_username', '');
-        $propovoice_password = get_option('pbb_propovoice_app_password', '');
         $especie = get_option('pbb_boleto_especie', '99');
         $aceite = get_option('pbb_boleto_aceite', 'A');
         $juros_codigo = get_option('pbb_boleto_juros_codigo', '3');
@@ -176,12 +172,36 @@ class PBB_Admin
                 <h2>Banrisul</h2>
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><label for="pbb_banrisul_client_id">Client ID</label></th>
-                        <td><input type="text" class="regular-text" name="pbb_banrisul_client_id" id="pbb_banrisul_client_id" value="<?php echo esc_attr($client_id); ?>"></td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="pbb_banrisul_client_secret">Client Secret</label></th>
-                        <td><input type="password" class="regular-text" name="pbb_banrisul_client_secret" id="pbb_banrisul_client_secret" value="<?php echo esc_attr($client_secret); ?>" autocomplete="off"></td>
+                        <th scope="row">Credenciais</th>
+                        <td>
+                            <?php
+                            $banrisul_configurado = false;
+
+                            if ($ambiente === 'producao') {
+                                $banrisul_configurado =
+                                    defined('PBB_BANRISUL_PRODUCAO_CLIENT_ID')
+                                    && PBB_BANRISUL_PRODUCAO_CLIENT_ID !== ''
+                                    && defined('PBB_BANRISUL_PRODUCAO_CLIENT_SECRET')
+                                    && PBB_BANRISUL_PRODUCAO_CLIENT_SECRET !== '';
+                            } else {
+                                $banrisul_configurado =
+                                    defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
+                                    && PBB_BANRISUL_SANDBOX_CLIENT_ID !== ''
+                                    && defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
+                                    && PBB_BANRISUL_SANDBOX_CLIENT_SECRET !== '';
+                            }
+                            ?>
+
+                            <?php if ($banrisul_configurado) : ?>
+                                <strong style="color: #008a20;">
+                                    Credenciais Banrisul configuradas no wp-config.php.
+                                </strong>
+                            <?php else : ?>
+                                <strong style="color: #b32d2e;">
+                                    Credenciais Banrisul não configuradas para este ambiente.
+                                </strong>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="pbb_banrisul_oauth_url">URL OAuth2</label></th>
@@ -198,14 +218,29 @@ class PBB_Admin
                 </table>
 
                 <h2>PROPOVOICE Public API</h2>
+
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><label for="pbb_propovoice_username">Usuário WordPress</label></th>
-                        <td><input type="text" class="regular-text" name="pbb_propovoice_username" id="pbb_propovoice_username" value="<?php echo esc_attr($propovoice_username); ?>"></td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="pbb_propovoice_app_password">Application Password</label></th>
-                        <td><input type="password" class="regular-text" name="pbb_propovoice_app_password" id="pbb_propovoice_app_password" value="<?php echo esc_attr($propovoice_password); ?>" autocomplete="off"></td>
+                        <th scope="row">Credenciais</th>
+                        <td>
+                            <?php
+                            $propovoice_configurado =
+                                defined('PBB_PROPOVOICE_USERNAME')
+                                && PBB_PROPOVOICE_USERNAME !== ''
+                                && defined('PBB_PROPOVOICE_APP_PASSWORD')
+                                && PBB_PROPOVOICE_APP_PASSWORD !== '';
+                            ?>
+
+                            <?php if ($propovoice_configurado) : ?>
+                                <strong style="color: #008a20;">
+                                    Credenciais PROPOVOICE configuradas no wp-config.php.
+                                </strong>
+                            <?php else : ?>
+                                <strong style="color: #b32d2e;">
+                                    Credenciais PROPOVOICE não configuradas.
+                                </strong>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 </table>
 
@@ -248,13 +283,9 @@ class PBB_Admin
         check_admin_referer('pbb_save_settings');
 
         update_option('pbb_banrisul_ambiente', sanitize_text_field($_POST['pbb_banrisul_ambiente'] ?? 'sandbox'));
-        update_option('pbb_banrisul_client_id', sanitize_text_field($_POST['pbb_banrisul_client_id'] ?? ''));
-        update_option('pbb_banrisul_client_secret', sanitize_text_field($_POST['pbb_banrisul_client_secret'] ?? ''));
         update_option('pbb_banrisul_oauth_url', esc_url_raw($_POST['pbb_banrisul_oauth_url'] ?? ''));
         update_option('pbb_banrisul_base_url', esc_url_raw($_POST['pbb_banrisul_base_url'] ?? ''));
         update_option('pbb_banrisul_beneficiario', sanitize_text_field($_POST['pbb_banrisul_beneficiario'] ?? ''));
-        update_option('pbb_propovoice_username', sanitize_text_field($_POST['pbb_propovoice_username'] ?? ''));
-        update_option('pbb_propovoice_app_password', sanitize_text_field($_POST['pbb_propovoice_app_password'] ?? ''));
         update_option('pbb_boleto_especie', sanitize_text_field($_POST['pbb_boleto_especie'] ?? '99'));
         update_option('pbb_boleto_aceite', sanitize_text_field($_POST['pbb_boleto_aceite'] ?? 'A'));
         update_option('pbb_boleto_juros_codigo', sanitize_text_field($_POST['pbb_boleto_juros_codigo'] ?? '3'));

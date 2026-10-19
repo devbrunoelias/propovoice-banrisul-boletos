@@ -13,8 +13,13 @@ class PBB_Propovoice_API
     public function __construct()
     {
         $this->base_url = home_url('/wp-json/ndpv/v1');
-        $this->username = get_option('pbb_propovoice_username');
-        $this->password = get_option('pbb_propovoice_app_password');
+        $this->username = defined('PBB_PROPOVOICE_USERNAME')
+            ? PBB_PROPOVOICE_USERNAME
+            : '';
+        
+        $this->password = defined('PBB_PROPOVOICE_APP_PASSWORD')
+            ? PBB_PROPOVOICE_APP_PASSWORD
+            : '';
     }
 
     private function auth_header(): string
