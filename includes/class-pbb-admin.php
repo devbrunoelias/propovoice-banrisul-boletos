@@ -12,6 +12,8 @@ class PBB_Admin
         add_action('admin_post_pbb_save_settings', [__CLASS__, 'handle_save_settings']);
         add_action('admin_post_pbb_generate_boleto', [__CLASS__, 'handle_generate_boleto']);
         add_action('admin_post_pbb_consultar_status', [__CLASS__, 'handle_consultar_status']);
+        add_action('admin_post_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
+        add_action('admin_post_nopriv_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
         add_action('init', [__CLASS__, 'register_shortcodes']);
     }
 
@@ -72,7 +74,23 @@ class PBB_Admin
                 return '<div class="banrisul-boleto"><p>Token inválido para acessar este boleto.</p></div>';
             }
 
-            $pdf_url = esc_url($boleto['pdf_url'] ?? '');
+            $pdf_url = '';
+
+            if (!empty($boleto['pdf_path'])) {
+                $pdf_url = add_query_arg(
+                    [
+                        'action' => 'pbb_download_boleto',
+                        'invoice_id' => absint(
+                            $boleto['propovoice_invoice_id']
+                        ),
+                        'token' => (string)(
+                            $boleto['propovoice_invoice_token'] ?? ''
+                        ),
+                    ],
+                    admin_url('admin-post.php')
+                );
+            }
+                
             $status_raw = (string)($boleto['status_local'] ?? '');
 
             ob_start();
@@ -162,9 +180,9 @@ class PBB_Admin
                     </button>
                 </div>
 
-                <?php if (!empty($pdf_url)) : ?>
+                <?php if ($pdf_url !== '') : ?>
                     <p style="margin-top: 20px;">
-                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener" style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #111827; color: #fff; text-decoration: none;">
+                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #111827; color: #fff; text-decoration: none;">
                             Abrir PDF do boleto
                         </a>
                     </p>
@@ -411,13 +429,41 @@ class PBB_Admin
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
                             $link_publico = '';
-                            if (!empty($boleto['propovoice_invoice_id']) && !empty($boleto['propovoice_invoice_token'])) {
+                            
+                            if (!empty($boleto['propovoice_invoice_id'])
+                                && !empty($boleto['propovoice_invoice_token'])
+                            ) {
                                 $link_publico = add_query_arg(
                                     [
-                                        'invoice_id' => $boleto['propovoice_invoice_id'],
-                                        'token' => $boleto['propovoice_invoice_token'],
+                                        'invoice_id' => absint(
+                                            $boleto['propovoice_invoice_id']
+                                        ),
+                                        'token' => (string)(
+                                            $boleto['propovoice_invoice_token']
+                                        ),
                                     ],
                                     site_url('/banrisul-boleto/')
+                                );
+                            }
+
+                            $pdf_url = '';
+
+                            if (
+                                !empty($boleto['propovoice_invoice_id'])
+                                && !empty($boleto['propovoice_invoice_token'])
+                                && !empty($boleto['pdf_path'])
+                            ) {
+                                $pdf_url = add_query_arg(
+                                    [
+                                        'action' => 'pbb_download_boleto',
+                                        'invoice_id' => absint(
+                                            $boleto['propovoice_invoice_id']
+                                        ),
+                                        'token' => (string)(
+                                            $boleto['propovoice_invoice_token']
+                                        ),
+                                    ],
+                                    admin_url('admin-post.php')
                                 );
                             }
                             ?>
@@ -429,8 +475,8 @@ class PBB_Admin
                                 <td><?php echo esc_html($boleto['nosso_numero']); ?></td>
                                 <td style="max-width: 280px; word-break: break-all;"><?php echo esc_html($boleto['linha_digitavel']); ?></td>
                                 <td>
-                                    <?php if (!empty($boleto['pdf_url'])) : ?>
-                                        <a href="<?php echo esc_url($boleto['pdf_url']); ?>" target="_blank" rel="noopener">Abrir PDF</a>
+                                    <?php if (!empty($pdf_url)) : ?>
+                                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener">Abrir PDF</a>
                                     <?php else : ?>
                                         -
                                     <?php endif; ?>
@@ -719,6 +765,113 @@ class PBB_Admin
     exit;
 }
 
+    public static function handle_download_boleto(): void
+    {
+        $invoice_id = absint($_GET['invoice_id'] ?? 0);
+
+        $token = sanitize_text_field(
+            wp_unslash($_GET['token'] ?? '')
+        );
+
+        if (!$invoice_id || $token === '') {
+            status_header(400);
+            wp_die(
+                esc_html('Parâmetros inválidos para o download.'),
+                esc_html('Download inválido'),
+                ['response' => 400]
+            );
+        }
+
+        $repo = new PBB_Boletos_Repository();
+        $boleto = $repo->get_by_invoice_id($invoice_id);
+
+        if (!$boleto) {
+            status_header(404);
+            wp_die(
+                esc_html('Boleto não encontrado.'),
+                esc_html('Boleto não encontrado'),
+                ['response' => 404]
+            );
+        }
+
+        $token_salvo = (string)(
+            $boleto['propovoice_invoice_token'] ?? ''
+        );
+
+        if (
+            $token_salvo === ''
+            || !hash_equals($token_salvo, $token)
+        ) {
+            status_header(403);
+            wp_die(
+                esc_html('Token inválido para acessar este boleto.'),
+                esc_html('Acesso negado'),
+                ['response' => 403]
+            );
+        }
+
+        $pdf_path = (string)($boleto['pdf_path'] ?? '');
+
+        if ($pdf_path === '') {
+            status_header(404);
+            wp_die(
+                esc_html('O PDF deste boleto não está disponível.'),
+                esc_html('PDF indisponível'),
+                ['response' => 404]
+            );
+        }
+
+        $arquivo_real = realpath($pdf_path);
+
+        $upload = wp_upload_dir();
+
+        $diretorio_permitido = realpath(
+            trailingslashit($upload['basedir'])
+            . 'banrisul-boletos'
+        );
+
+        if (
+            !$arquivo_real
+            || !$diretorio_permitido
+            || !is_file($arquivo_real)
+            || !is_readable($arquivo_real)
+            || strpos(
+                $arquivo_real,
+                $diretorio_permitido . DIRECTORY_SEPARATOR
+            ) !== 0
+            || strtolower(pathinfo($arquivo_real, PATHINFO_EXTENSION)) !== 'pdf'
+        ) {
+            status_header(404);
+            wp_die(
+                esc_html('Arquivo PDF não localizado.'),
+                esc_html('PDF indisponível'),
+                ['response' => 404]
+            );
+        }
+
+        $nome_download = 'boleto-' . sanitize_file_name(
+                (string)($boleto['nosso_numero'] ?? $invoice_id)
+        )
+        . '.pdf';
+
+        nocache_headers();
+
+        header('Content-Type: application/pdf');
+
+        header(
+            'Content-Disposition: inline; filename="'
+            . $nome_download
+            . '"'
+        );
+        header('Content-Length: ' . filesize($arquivo_real));
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Security-Policy: sandbox');
+        header('Referrer-Policy: no-referrer');
+
+        readfile($arquivo_real);
+        exit;
+    }
+
     private static function find_invoice_by_id(array $response, int $invoice_id): ?array
     {
         $items = $response['data']['result'] ?? [];
@@ -841,6 +994,57 @@ class PBB_Admin
         return number_format((float)$value, 2, '.', '');
     }
 
+    private static function ensure_protected_dir(string $dir): void
+    {
+        if (!is_dir($dir) && !wp_mkdir_p($dir)) {
+            throw new Exception(
+                'Não foi possível criar o diretório protegido dos boletos.'
+            );
+        }
+
+        $htaccess_path = trailingslashit($dir) . '.htaccess';
+
+        $htaccess_content =
+            "<IfModule mod_authz_core.c>\n" .
+            "    Require all denied\n" .
+            "</IfModule>\n\n" .
+            "<IfModule !mod_authz_core.c>\n" .
+            "    Order Allow,Deny\n" .
+            "    Deny from all\n" .
+            "</IfModule>\n\n" .
+            "Options -Indexes\n";
+
+        if (!is_file($htaccess_path)) {
+            $written = file_put_contents(
+                $htaccess_path,
+                $htaccess_content,
+                LOCK_EX
+            );
+
+            if ($written === false) {
+                throw new Exception(
+                    'Não foi possível criar a proteção .htaccess dos boletos.'
+                );
+            }
+        }
+
+        $index_path = trailingslashit($dir) . 'index.php';
+
+        if (!is_file($index_path)) {
+            $written = file_put_contents(
+                $index_path,
+                "<?php\n// Silence is golden.\n",
+                LOCK_EX
+            );
+
+            if ($written === false) {
+                throw new Exception(
+                    'Não foi possível criar o arquivo de proteção index.php.'
+                );
+            }
+        }
+    }
+
     private static function save_pdf_from_base64(string $base64, string $nosso_numero): array
     {
         $upload = wp_upload_dir();
@@ -849,9 +1053,8 @@ class PBB_Admin
         }
 
         $dir = trailingslashit($upload['basedir']) . 'banrisul-boletos';
-        if (!file_exists($dir)) {
-            wp_mkdir_p($dir);
-        }
+        
+        self::ensure_protected_dir($dir);
 
         $filename = 'boleto-' . sanitize_file_name($nosso_numero ?: uniqid('boleto-', true)) . '.pdf';
         $path = trailingslashit($dir) . $filename;

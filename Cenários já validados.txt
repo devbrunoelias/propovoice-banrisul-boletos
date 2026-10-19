@@ -1,0 +1,8 @@
+A proteção completa terá duas partes:
+
+o cliente acessa o PDF por uma URL com token;
+o servidor bloqueia o acesso direto à pasta onde o PDF está armazenado.
+
+Apenas trocar o link não basta se o arquivo continuar acessível pela URL antiga. 
+↓                                                                                   ↓
+Uma solução de arquivos privados precisa combinar URL protegida com bloqueio no servidor.
