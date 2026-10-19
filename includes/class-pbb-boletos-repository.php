@@ -192,6 +192,45 @@ class PBB_Boletos_Repository
         return is_array($rows) ? $rows : [];
     }
 
+    public function count_all(): int
+    {
+        global $wpdb;
+
+        $total = $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$this->table}"
+        );
+
+        return absint($total);
+    }
+
+    public function list_paginated(
+        int $per_page = 20,
+        int $page = 1
+    ): array {
+        global $wpdb;
+
+        $per_page = max(1, min(100, $per_page));
+        $page = max(1, $page);
+
+        $offset = ($page - 1) * $per_page;
+
+        $sql = $wpdb->prepare(
+            "SELECT *
+            FROM {$this->table}
+            ORDER BY id DESC
+            LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        );
+
+        $rows = $wpdb->get_results(
+            $sql,
+            ARRAY_A
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
     public function update_status_from_consulta(int $id, array $consulta): void
     {
         global $wpdb;
@@ -211,6 +250,29 @@ class PBB_Boletos_Repository
             'payload_consulta' => $this->json_or_null($consulta),
             'updated_at' => current_time('mysql'),
         ];
+
+        /*
+            * Sincroniza o vencimento local com o vencimento
+            * retornado pela consulta ao Banrisul.
+        */
+
+        if (!empty($titulo['data_vencimento'])) {
+            $row['data_vencimento'] = sanitize_text_field(
+                (string) $titulo['data_vencimento']
+            );
+        }
+
+        if (!empty($titulo['codigo_barras'])) {
+            $row['codigo_barras'] = sanitize_text_field(
+                (string) $titulo['codigo_barras']
+            );
+        }
+
+        if (!empty($titulo['linha_digitavel'])) {
+            $row['linha_digitavel'] = sanitize_text_field(
+                (string) $titulo['linha_digitavel']
+            );
+        }
 
         if (!empty($operacoes['data_pagamento'])) {
             $row['data_pagamento'] = sanitize_text_field(
@@ -328,6 +390,39 @@ class PBB_Boletos_Repository
         }
     }
 
+    public function update_pdf_from_emissao(
+        int $id,
+        array $pdf,
+        array $emissao
+    ): void {
+        global $wpdb;
+
+        $row = [
+            'pdf_path' => sanitize_text_field(
+                (string) ($pdf['path'] ?? '')
+            ),
+            'pdf_url' => esc_url_raw(
+                (string) ($pdf['url'] ?? '')
+            ),
+            'payload_emissao' => $this->json_or_null($emissao),
+            'updated_at' => current_time('mysql'),
+        ];
+
+        $updated = $wpdb->update(
+            $this->table,
+            $row,
+            ['id' => absint($id)],
+            null,
+            ['%d']
+        );
+
+        if ($updated === false) {
+            throw new Exception(
+                'Erro ao atualizar PDF do boleto: ' . $wpdb->last_error
+            );
+        }
+    }
+
     private function json_or_null($value): ?string
     {
         if ($value === null || $value === '') {
@@ -349,6 +444,8 @@ class PBB_Boletos_Repository
         WHERE status_local IN (
             'boleto_gerado',
             'aguardando_pagamento',
+            'pagamento_identificado',
+            'credito_retido',
             'boleto_registrado_sem_pdf'
         )
         AND codigo_barras <> ''

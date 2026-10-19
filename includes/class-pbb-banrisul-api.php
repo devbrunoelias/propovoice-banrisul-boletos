@@ -245,6 +245,70 @@ class PBB_Banrisul_API
         return $this->handle_response($response, 'Consultar boleto');
     }
 
+    public function alterar_vencimento_boleto(
+        string $codigo_barras,
+        string $nova_data_vencimento
+    ): array {
+        $this->validate_settings();
+
+        if ($codigo_barras === '') {
+            throw new Exception(
+                'Código de barras ausente para alterar o vencimento.'
+            );
+        }
+
+        $data = DateTime::createFromFormat(
+            'Y-m-d',
+            $nova_data_vencimento
+        );
+
+        $data_valida = (
+            $data instanceof DateTime
+            && $data->format('Y-m-d') === $nova_data_vencimento
+        );
+
+        if (!$data_valida) {
+            throw new Exception(
+                'Nova data de vencimento inválida.'
+            );
+        }
+
+        $token = $this->get_token();
+
+        $url = $this->base_url
+            . '/boletos/'
+            . rawurlencode($codigo_barras)
+            . '?tipo_id=CODIGO_BARRAS&tipo_alteracao=06';
+
+        $payload = [
+            'titulo' => [
+                'data_vencimento' => $nova_data_vencimento,
+            ],
+        ];
+
+        $response = wp_remote_request(
+            $url,
+            [
+                'method' => 'PATCH',
+                'timeout' => 45,
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                    'bergs-beneficiario' => $this->beneficiario,
+                    'bergs-ambiente' => $this->get_ambiente_banrisul(),
+                ],
+                'body' => wp_json_encode($payload),
+                'data_format' => 'body',
+            ]
+        );
+
+        return $this->handle_response(
+            $response,
+            'Alterar vencimento do boleto'
+        );
+    }
+
     public function baixar_boleto_por_codigo_barras(string $codigo_barras): array
     {
         $this->validate_settings();

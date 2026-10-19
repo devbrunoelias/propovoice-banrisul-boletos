@@ -12,6 +12,7 @@ class PBB_Admin
         add_action('admin_post_pbb_save_settings', [__CLASS__, 'handle_save_settings']);
         add_action('admin_post_pbb_generate_boleto', [__CLASS__, 'handle_generate_boleto']);
         add_action('admin_post_pbb_consultar_status', [__CLASS__, 'handle_consultar_status']);
+        add_action('admin_post_pbb_alterar_vencimento', [__CLASS__, 'handle_alterar_vencimento']);
         add_action('admin_post_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
         add_action('admin_post_nopriv_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
         add_action('admin_post_pbb_upload_nfe', [self::class, 'handle_upload_nfe']);
@@ -157,9 +158,9 @@ class PBB_Admin
                     "
                     >
             
-                <h2 style="margin-top: 0;">Documentos para pagamento</h2>
+                <h2 style="margin-top: 0;">Documento(s) para pagamento</h2>
                 <p>
-                    Consulte abaixo o boleto e a nota fiscal referentes à sua cobrança.
+                    Consulte abaixo documento(s) referente à sua cobrança.
                 </p>
 
                 <p><strong>Invoice:</strong> <?php echo esc_html($boleto['propovoice_invoice_num'] ?? ''); ?></p>
@@ -548,7 +549,32 @@ class PBB_Admin
         self::render_environment_notice();
 
         $repo = new PBB_Boletos_Repository();
-        $boletos = $repo->list_recent(20);
+        
+        $per_page = 20;
+
+        $pbb_paged = isset($_GET['pbb_paged'])
+            ? max(1, absint($_GET['pbb_paged']))
+            : 1;
+
+        $total_boletos = $repo->count_all();
+
+        $total_paginas = max(
+            1,
+            (int) ceil($total_boletos / $per_page)
+        );
+
+        /*
+        * Impede acessar uma página acima da última existente.
+        */
+        if ($pbb_paged > $total_paginas) {
+            $pbb_paged = $total_paginas;
+        }
+
+        $boletos = $repo->list_paginated(
+            $per_page,
+            $pbb_paged
+        );
+
         $empresas = PBB_Empresas_Config::all();
         ?>
 
@@ -637,7 +663,7 @@ class PBB_Admin
                                 <input
                                     type="text"
                                     name="multa_percentual"
-                                    value="2,0"
+                                    value="4,0"
                                     size="6"
                                     inputmode="decimal"
                                 >
@@ -725,13 +751,14 @@ class PBB_Admin
                         <th>Nota fiscal</th>
                         <th>Link público</th>
                         <th>Consultar status</th>
+                        <th>Alterar vencimento</th>
                         <th>Status</th>
                         <th>Pagamento</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($boletos)) : ?>
-                        <tr><td colspan="13">Nenhum boleto gerado ainda.</td></tr>
+                        <tr><td colspan="14">Nenhum boleto gerado ainda.</td></tr>
                     <?php else : ?>
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
@@ -968,6 +995,96 @@ class PBB_Admin
                                 </td>
 
                                 <td>
+                                    <?php
+                                    $status_local = (string) (
+                                        $boleto['status_local'] ?? ''
+                                    );
+
+                                    $pode_alterar_vencimento = (
+                                        !empty($boleto['id'])
+                                        && !empty($boleto['codigo_barras'])
+                                        && (string) ($boleto['situacao_pagamento'] ?? '') !== '2'
+                                        && !in_array(
+                                            $status_local,
+                                            [
+                                                'pago',
+                                                'pagamento_identificado',
+                                                'baixado',
+                                                'rejeitado_cip',
+                                            ],
+                                            true
+                                        )
+                                    );
+                                    ?>
+
+                                    <?php if ($pode_alterar_vencimento) : ?>
+                                        
+                                    <form     
+                                            method="post"
+                                            action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                                            style="margin: 0; min-width: 160px;"
+                                            onsubmit="return confirm(
+                                                'Confirma a alteração do vencimento deste boleto?'
+                                            );"
+                                        >
+                                            <?php
+                                            wp_nonce_field(
+                                                'pbb_alterar_vencimento_'
+                                                . absint($boleto['id'])
+                                            );
+                                            ?>
+
+                                            <input
+                                                type="hidden"
+                                                name="action"
+                                                value="pbb_alterar_vencimento"
+                                            >
+
+                                            <input
+                                                type="hidden"
+                                                name="boleto_id"
+                                                value="<?php
+                                                    echo esc_attr(
+                                                        absint($boleto['id'])
+                                                    );
+                                                ?>"
+                                            >
+
+                                            <input
+                                                type="date"
+                                                name="nova_data_vencimento"
+                                                value="<?php
+                                                    echo esc_attr(
+                                                        (string) (
+                                                            $boleto['data_vencimento'] ?? ''
+                                                        )
+                                                    );
+                                                ?>"
+                                                min="<?php
+                                                    echo esc_attr(
+                                                        current_time('Y-m-d')
+                                                    );
+                                                ?>"
+                                                required
+                                                style="width: 150px; margin-bottom: 5px;"
+                                            >
+
+                                            <br>
+
+                                            <button
+                                                type="submit"
+                                                class="button button-small"
+                                            >
+                                                Alterar vencimento
+                                            </button>
+                                        </form>
+                                    <?php else : ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+
+
+                                <td>
                                     <?php echo esc_html(
                                         self::format_status((string) ($boleto['status_local'] ?? ''))
                                     ); ?>
@@ -1007,6 +1124,55 @@ class PBB_Admin
                     <?php endif; ?>
                 </tbody>
             </table>
+
+            <?php if ($total_paginas > 1) : ?>
+                <div
+                    class="tablenav"
+                    style="margin-top: 16px;"
+                >
+                    <div class="tablenav-pages">
+                        <span class="displaying-num">
+                            <?php
+                            echo esc_html(
+                                sprintf(
+                                    _n(
+                                        '%s boleto',
+                                        '%s boletos',
+                                        $total_boletos,
+                                        'propovoice-banrisul-boletos'
+                                    ),
+                                    number_format_i18n($total_boletos)
+                                )
+                            );
+                            ?>
+                        </span>
+
+                        <?php
+                        $base_url = add_query_arg(
+                            [
+                                'page' => 'pbb-generate',
+                                'pbb_paged' => '%#%',
+                            ],
+                            admin_url('admin.php')
+                        );
+
+                        echo wp_kses_post(
+                            paginate_links(
+                                [
+                                    'base' => $base_url,
+                                    'format' => '',
+                                    'current' => $pbb_paged,
+                                    'total' => $total_paginas,
+                                    'prev_text' => '‹ Anterior',
+                                    'next_text' => 'Próxima ›',
+                                    'type' => 'list',
+                                ]
+                            )
+                        );
+                        ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
         <?php
     }
@@ -1258,6 +1424,345 @@ class PBB_Admin
         exit;
     }
 
+    public static function handle_alterar_vencimento(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Sem permissão.');
+        }
+
+        $boleto_id = absint(
+            $_POST['boleto_id'] ?? 0
+        );
+
+        $nova_data_vencimento = sanitize_text_field(
+            wp_unslash($_POST['nova_data_vencimento'] ?? '')
+        );
+
+        if (!$boleto_id) {
+            self::set_notice(
+                'Boleto inválido para alteração de vencimento.',
+                'error'
+            );
+
+            wp_safe_redirect(
+                admin_url('admin.php?page=pbb-generate')
+            );
+
+            exit;
+        }
+
+        check_admin_referer(
+            'pbb_alterar_vencimento_' . $boleto_id
+        );
+
+        try {
+            /*
+            * Valida a nova data.
+            */
+            $data = DateTime::createFromFormat(
+                'Y-m-d',
+                $nova_data_vencimento
+            );
+
+            $data_valida = (
+                $data instanceof DateTime
+                && $data->format('Y-m-d')
+                    === $nova_data_vencimento
+            );
+
+            if (!$data_valida) {
+                throw new Exception(
+                    'Informe uma nova data de vencimento válida.'
+                );
+            }
+
+            /*
+            * Neste primeiro momento, permitimos a data de hoje
+            * ou uma data futura.
+            */
+            $hoje = current_time('Y-m-d');
+
+            if ($nova_data_vencimento < $hoje) {
+                throw new Exception(
+                    'A nova data de vencimento não pode estar no passado.'
+                );
+            }
+
+            $repo = new PBB_Boletos_Repository();
+            $boleto = $repo->get_by_id($boleto_id);
+
+            if (!$boleto) {
+                throw new Exception(
+                    'Boleto não encontrado no banco de dados.'
+                );
+            }
+
+            if (empty($boleto['codigo_barras'])) {
+                throw new Exception(
+                    'Boleto sem código de barras para alteração.'
+                );
+            }
+
+            /*
+            * Bloqueia estados que não devem aceitar alteração.
+            */
+            $status_local = (string) (
+                $boleto['status_local'] ?? ''
+            );
+
+            $situacao_pagamento = (string) (
+                $boleto['situacao_pagamento'] ?? ''
+            );
+
+            $status_bloqueados = [
+                'pago',
+                'pagamento_identificado',
+                'baixado',
+                'rejeitado_cip',
+            ];
+
+            if (
+                $situacao_pagamento === '2'
+                || in_array(
+                    $status_local,
+                    $status_bloqueados,
+                    true
+                )
+            ) {
+                throw new Exception(
+                    'O vencimento não pode ser alterado porque '
+                    . 'o pagamento já foi identificado ou o boleto '
+                    . 'não está mais disponível para alteração.'
+                );
+            }
+
+            $data_atual = (string) (
+                $boleto['data_vencimento'] ?? ''
+            );
+
+            if ($nova_data_vencimento === $data_atual) {
+                throw new Exception(
+                    'A nova data é igual ao vencimento atual.'
+                );
+            }
+
+            $ambiente = (string) get_option(
+                'pbb_banrisul_ambiente',
+                'sandbox'
+            );
+
+            $empresa_id = sanitize_key(
+                (string) ($boleto['empresa_id'] ?? '')
+            );
+
+            if ($empresa_id === '') {
+                if ($ambiente === 'sandbox') {
+                    $empresa_id = 'empresa_1';
+                } else {
+                    throw new Exception(
+                        'O boleto não possui empresa emissora vinculada.'
+                    );
+                }
+            }
+
+            if (!PBB_Empresas_Config::exists($empresa_id)) {
+                throw new Exception(
+                    'A empresa emissora vinculada ao boleto é inválida.'
+                );
+            }
+
+            $banrisul = new PBB_Banrisul_API($empresa_id);
+
+            /*
+            * Consulta antes da alteração para confirmar
+            * a situação atual do título.
+            */
+            $codigo_barras = (string) $boleto['codigo_barras'];
+
+            $consulta_anterior =
+                $banrisul->consultar_boleto_por_codigo_barras(
+                    $codigo_barras
+                );
+
+            $titulo_anterior =
+                $consulta_anterior['titulo'] ?? [];
+
+            $situacao_banrisul = (string) (
+                $titulo_anterior['situacao_banrisul'] ?? ''
+            );
+
+            $situacao_cip = (string) (
+                $titulo_anterior['situacao_cip'] ?? ''
+            );
+
+            $situacao_pagamento_atual = (string) (
+                $titulo_anterior['situacao_pagamento'] ?? ''
+            );
+
+            if ($situacao_pagamento_atual === '2') {
+                $repo->update_status_from_consulta(
+                    $boleto_id,
+                    $consulta_anterior
+                );
+
+                throw new Exception(
+                    'O pagamento deste boleto já foi identificado pelo Banrisul. '
+                    . 'A alteração do vencimento não é permitida.'
+                );
+            }
+
+            /*
+            * O título precisa continuar ativo.
+            */
+            if (
+                $situacao_banrisul !== 'A'
+                || $situacao_cip !== 'A'
+            ) {
+                $repo->update_status_from_consulta(
+                    $boleto_id,
+                    $consulta_anterior
+                );
+
+                throw new Exception(
+                    'O título não está ativo no Banrisul e na CIP. '
+                    . 'Consulte o status antes de tentar novamente.'
+                );
+            }
+
+            /*
+            * Executa o PATCH tipo 06.
+            */
+            $alteracao =
+                $banrisul->alterar_vencimento_boleto(
+                    $codigo_barras,
+                    $nova_data_vencimento
+                );
+
+            /*
+            * Consulta novamente para obter os dados efetivos.
+            */
+            $consulta_atualizada =
+                $banrisul->consultar_boleto_por_codigo_barras(
+                    $codigo_barras
+                );
+
+            $titulo_atualizado =
+                $consulta_atualizada['titulo'] ?? [];
+
+            $data_confirmada = (string) (
+                $titulo_atualizado['data_vencimento'] ?? ''
+            );
+
+            /*
+            * Em produção, confirma que a nova data foi efetivada.
+            * No sandbox, o Banrisul apenas valida a requisição.
+            */
+            if (
+                $ambiente !== 'sandbox'
+                && $data_confirmada !== $nova_data_vencimento
+            ) {
+                throw new Exception(
+                    'O Banrisul não confirmou a nova data '
+                    . 'de vencimento após a alteração.'
+                );
+            }
+
+            /*
+            * Atualiza vencimento, status e payload da consulta.
+            */
+            $repo->update_status_from_consulta(
+                $boleto_id,
+                $consulta_atualizada
+            );
+
+            /*
+            * Reemite o PDF atualizado.
+            */
+            $codigo_barras_atual = (string) (
+                $titulo_atualizado['codigo_barras']
+                ?? $codigo_barras
+            );
+
+            if ($codigo_barras_atual === '') {
+                throw new Exception(
+                    'Código de barras ausente para reemitir o boleto.'
+                );
+            }
+
+            $emissao = $banrisul->emitir_boleto_por_codigo_barras(
+                $codigo_barras_atual
+            );
+
+            $base64_pdf = (string) (
+                $emissao['titulo']['boleto'] ?? ''
+            );
+
+            if ($base64_pdf === '') {
+                throw new Exception(
+                    'O vencimento foi alterado, mas o Banrisul '
+                    . 'não retornou o novo PDF.'
+                );
+            }
+
+            $nosso_numero = (string) (
+                $titulo_atualizado['nosso_numero']
+                ?? $boleto['nosso_numero']
+                ?? ''
+            );
+
+            if ($nosso_numero === '') {
+                throw new Exception(
+                    'Nosso número ausente para salvar o novo PDF.'
+                );
+            }
+
+            $pdf = self::save_pdf_from_base64(
+                $base64_pdf,
+                $nosso_numero
+            );
+
+            $repo->update_pdf_from_emissao(
+                $boleto_id,
+                $pdf,
+                $emissao
+            );
+
+            if ($ambiente === 'sandbox') {
+                self::set_notice(
+                    'Solicitação de alteração validada no sandbox. '
+                    . 'O ambiente de testes não efetiva a nova data.',
+                    'success'
+                );
+            } else {
+                self::set_notice(
+                    'Vencimento alterado para '
+                    . date_i18n(
+                        'd/m/Y',
+                        strtotime($nova_data_vencimento)
+                    )
+                    . '. O boleto e o PDF foram atualizados.',
+                    'success'
+                );
+            }
+        } catch (Throwable $e) {
+            self::set_notice(
+                'Erro ao alterar vencimento: '
+                . $e->getMessage()
+                . ' em '
+                . $e->getFile()
+                . ':'
+                . $e->getLine(),
+                'error'
+                );
+            }
+
+            wp_safe_redirect(
+                admin_url('admin.php?page=pbb-generate')
+            );
+
+            exit;
+        }    
+
     public static function handle_consultar_status(): void
     {
         if (!current_user_can('manage_options')) {
@@ -1279,16 +1784,25 @@ class PBB_Admin
             $boleto = $repo->get_by_id($boleto_id);
 
             if (!$boleto) {
-                throw new Exception('Boleto não encontrado no banco de dados.');
+                throw new Exception(
+                    'Boleto não encontrado no banco de dados.'
+                );
             }
 
             if (empty($boleto['codigo_barras'])) {
-                throw new Exception('Boleto sem código de barras para consulta.');
+                throw new Exception(
+                    'Boleto sem código de barras para consulta.'
+                );
             }
 
-            $ambiente = (string)get_option('pbb_banrisul_ambiente', 'sandbox');
+            $ambiente = (string) get_option(
+                'pbb_banrisul_ambiente',
+                'sandbox'
+            );
 
-            $empresa_id = sanitize_key((string)($boleto['empresa_id'] ?? ''));
+            $empresa_id = sanitize_key(
+                (string) ($boleto['empresa_id'] ?? '')
+            );
 
             if ($empresa_id === '') {
                 if ($ambiente === 'sandbox') {
@@ -1309,31 +1823,129 @@ class PBB_Admin
             $banrisul = new PBB_Banrisul_API($empresa_id);
 
             if ($ambiente === 'sandbox') {
-                $codigo_consulta = '04191861100000150502100100000010000000024047';
+                $codigo_consulta =
+                    '04191861100000150502100100000010000000024047';
             } else {
                 $codigo_consulta = (string) $boleto['codigo_barras'];
             }
 
+            /*
+            * Guarda a data local antes de atualizar o banco.
+            */
+            $data_vencimento_anterior = (string) (
+                $boleto['data_vencimento'] ?? ''
+            );
+
+            /*
+            * Consulta o estado atual no Banrisul.
+            */
             $consulta = $banrisul->consultar_boleto_por_codigo_barras(
                 $codigo_consulta
             );
 
-            $repo->update_status_from_consulta($boleto_id, $consulta);
+            $titulo_consulta = $consulta['titulo'] ?? [];
+
+            /*
+            * Obtém a data devolvida pelo Banrisul.
+            */
+            $data_vencimento_nova = (string) (
+                $titulo_consulta['data_vencimento'] ?? ''
+            );
+
+            /*
+            * Identifica se houve efetivamente mudança de vencimento.
+            */
+            $vencimento_alterado = (
+                $data_vencimento_nova !== ''
+                && $data_vencimento_nova !== $data_vencimento_anterior
+            );
+
+            /*
+            * Atualiza status, vencimento e payload da consulta.
+            */
+            $repo->update_status_from_consulta(
+                $boleto_id,
+                $consulta
+            );
+
+            /*
+            * Reemite o PDF somente se o vencimento mudou.
+            */
+            if ($vencimento_alterado) {
+                $codigo_barras_atual = (string) (
+                    $titulo_consulta['codigo_barras']
+                    ?? $boleto['codigo_barras']
+                    ?? ''
+                );
+
+                if ($codigo_barras_atual === '') {
+                    throw new Exception(
+                        'Código de barras ausente para reemitir o boleto.'
+                    );
+                }
+
+                $emissao = $banrisul->emitir_boleto_por_codigo_barras(
+                    $codigo_barras_atual
+                );
+
+                $base64_pdf = (string) (
+                    $emissao['titulo']['boleto'] ?? ''
+                );
+
+                if ($base64_pdf === '') {
+                    throw new Exception(
+                        'Banrisul não retornou o PDF atualizado do boleto.'
+                    );
+                }
+
+                $nosso_numero = (string) (
+                    $titulo_consulta['nosso_numero']
+                    ?? $boleto['nosso_numero']
+                    ?? ''
+                );
+
+                if ($nosso_numero === '') {
+                    throw new Exception(
+                        'Nosso número ausente para salvar o novo PDF.'
+                    );
+                }
+
+                $pdf = self::save_pdf_from_base64(
+                    $base64_pdf,
+                    $nosso_numero
+                );
+
+                $repo->update_pdf_from_emissao(
+                    $boleto_id,
+                    $pdf,
+                    $emissao
+                );
+            }
 
             if ($ambiente === 'sandbox') {
                 self::set_notice(
                     'Consulta sandbox realizada usando o título exemplo do Banrisul.',
                     'success'
                 );
+            } elseif ($vencimento_alterado) {
+                self::set_notice(
+                    'Status, vencimento e PDF do boleto atualizados com sucesso.',
+                    'success'
+                );
             } else {
                 self::set_notice(
-                    'Status do boleto consultado com sucesso.',
+                    'Status do boleto consultado com sucesso. O vencimento não foi alterado.',
                     'success'
                 );
             }
         } catch (Throwable $e) {
             self::set_notice(
-                'Erro ao consultar status: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine(),
+                'Erro ao consultar status: '
+                . $e->getMessage()
+                . ' em '
+                . $e->getFile()
+                . ':'
+                . $e->getLine(),
                 'error'
             );
         }
