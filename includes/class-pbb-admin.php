@@ -14,6 +14,9 @@ class PBB_Admin
         add_action('admin_post_pbb_consultar_status', [__CLASS__, 'handle_consultar_status']);
         add_action('admin_post_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
         add_action('admin_post_nopriv_pbb_download_boleto', [__CLASS__, 'handle_download_boleto']);
+        add_action('admin_post_pbb_upload_nfe', [self::class, 'handle_upload_nfe']);
+        add_action('admin_post_pbb_download_nfe', [self::class, 'handle_download_nfe']);
+        add_action('admin_post_nopriv_pbb_download_nfe', [self::class, 'handle_download_nfe']);
         add_action('init', [__CLASS__, 'register_shortcodes']);
     }
 
@@ -95,6 +98,30 @@ class PBB_Admin
                 return '<div class="banrisul-boleto"><p>Token inválido para acessar este boleto.</p></div>';
             }
 
+            $logo_url = PBB_URL
+                . 'assets/images/logo-catania-studio.png';
+
+            $nfe_url = '';
+
+            if (
+                !empty($boleto['nfe_pdf_path'])
+                && !empty($boleto['propovoice_invoice_id'])
+                && !empty($boleto['propovoice_invoice_token'])
+            ) {
+                $nfe_url = add_query_arg(
+                    [
+                        'action' => 'pbb_download_nfe',
+                        'invoice_id' => absint(
+                            $boleto['propovoice_invoice_id']
+                        ),
+                        'token' => (string)(
+                            $boleto['propovoice_invoice_token']
+                        ),
+                    ],
+                    admin_url('admin-post.php')
+                );
+            }
+
             $pdf_url = '';
 
             if (!empty($boleto['pdf_path'])) {
@@ -117,7 +144,23 @@ class PBB_Admin
             ob_start();
             ?>
             <div class="banrisul-boleto" style="max-width: 760px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
-                <h2 style="margin-top: 0;">Boleto Banrisul</h2>
+                <img src="<?php echo esc_url($logo_url); ?>" alt="Logo da empresa"
+                    loading="eager"
+                    fetchpriority="high"
+                    decoding="async"
+                    style="
+                        display: block;
+                        width: 100%;
+                        max-width: 240px;
+                        height: auto;
+                        margin: 0 auto 24px;
+                    "
+                    >
+            
+                <h2 style="margin-top: 0;">Documentos para pagamento</h2>
+                <p>
+                    Consulte abaixo o boleto e a nota fiscal referentes à sua cobrança.
+                </p>
 
                 <p><strong>Invoice:</strong> <?php echo esc_html($boleto['propovoice_invoice_num'] ?? ''); ?></p>
 
@@ -214,6 +257,18 @@ class PBB_Admin
                     </p>
                 <?php else : ?>
                     <p style="margin-top: 20px;">PDF ainda não disponível para este boleto.</p>
+                <?php endif; ?>
+
+                <?php if ($nfe_url !== '') : ?>
+                    <p style="margin-top: 12px;">
+                        <a href="<?php echo esc_url($nfe_url); ?>"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #047857; color: #fff; text-decoration: none;"
+                        >
+                            Abrir nota fiscal
+                        </a>
+                    </p>    
                 <?php endif; ?>
 
                 <?php if ($status_raw === 'boleto_sandbox_pdf_exemplo') : ?>
@@ -582,7 +637,7 @@ class PBB_Admin
                                 <input
                                     type="text"
                                     name="multa_percentual"
-                                    value="2,0"
+                                    value="4,0"
                                     size="6"
                                     inputmode="decimal"
                                 >
@@ -666,7 +721,8 @@ class PBB_Admin
                         <th>Vencimento</th>
                         <th>Nosso número</th>
                         <th>Linha digitável</th>
-                        <th>PDF</th>
+                        <th>Boleto</th>
+                        <th>Nota fiscal</th>
                         <th>Link público</th>
                         <th>Consultar status</th>
                         <th>Status</th>
@@ -675,7 +731,7 @@ class PBB_Admin
                 </thead>
                 <tbody>
                     <?php if (empty($boletos)) : ?>
-                        <tr><td colspan="12">Nenhum boleto gerado ainda.</td></tr>
+                        <tr><td colspan="13">Nenhum boleto gerado ainda.</td></tr>
                     <?php else : ?>
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
@@ -707,6 +763,27 @@ class PBB_Admin
                                 $pdf_url = add_query_arg(
                                     [
                                         'action' => 'pbb_download_boleto',
+                                        'invoice_id' => absint(
+                                            $boleto['propovoice_invoice_id']
+                                        ),
+                                        'token' => (string)(
+                                            $boleto['propovoice_invoice_token']
+                                        ),
+                                    ],
+                                    admin_url('admin-post.php')
+                                );
+                            }
+
+                            $nfe_url = '';
+
+                            if (
+                                !empty($boleto['propovoice_invoice_id'])
+                                && !empty($boleto['propovoice_invoice_token'])
+                                && !empty($boleto['nfe_pdf_path'])
+                            ) {
+                                $nfe_url = add_query_arg(
+                                    [
+                                        'action' => 'pbb_download_nfe',
                                         'invoice_id' => absint(
                                             $boleto['propovoice_invoice_id']
                                         ),
@@ -770,11 +847,103 @@ class PBB_Admin
                                 <td style="max-width: 280px; word-break: break-all;"><?php echo esc_html($boleto['linha_digitavel']); ?></td>
                                 <td>
                                     <?php if (!empty($pdf_url)) : ?>
-                                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener">Abrir PDF</a>
+                                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener">Abrir boleto</a>
                                     <?php else : ?>
                                         -
                                     <?php endif; ?>
                                 </td>
+
+                                <td>
+                                    <?php if (!empty($boleto['nfe_pdf_path'])) : ?>
+                                        <p style="margin-top: 0;">
+                                            <strong>NFe anexada</strong>
+                                        </p>
+
+                                        <?php if (!empty($boleto['nfe_pdf_nome'])) : ?>
+                                            <small>
+                                                <?php
+                                                echo esc_html(
+                                                    $boleto['nfe_pdf_nome']
+                                                );
+                                                ?>
+                                            </small>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($nfe_url)) : ?>
+                                            <p>
+                                                <a href="<?php echo esc_url($nfe_url); ?>"            
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    Abrir NFe
+                                                </a>
+                                            </p>
+                                        <?php endif; ?>
+
+                                        <p>
+                                            <em>Selecione outro PDF para substituir.</em>
+                                        </p>
+                                    <?php else : ?>
+                                        <p style="margin-top: 0;">
+                                            Nenhuma NFe anexada.
+                                        </p>
+                                    <?php endif; ?>
+
+                                    <form
+                                        method="post"
+                                        action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                                        enctype="multipart/form-data"
+                                        style="margin: 0;"
+                                    >
+                                        <input
+                                            type="hidden"
+                                            name="action"
+                                            value="pbb_upload_nfe"
+                                        >
+
+                                        <input
+                                            type="hidden"
+                                            name="boleto_id"
+                                            value="<?php
+                                                echo esc_attr(
+                                                    absint($boleto['id'] ?? 0)
+                                                );
+                                            ?>"
+                                        >
+
+                                        <?php
+                                        wp_nonce_field(
+                                            'pbb_upload_nfe_'
+                                            . absint($boleto['id'] ?? 0)
+                                        );
+                                        ?>
+
+                                        <input
+                                            type="file"
+                                            name="nfe_pdf"
+                                            accept="application/pdf,.pdf"
+                                            required
+                                        >
+
+                                        <p>
+                                            <button
+                                                type="submit"
+                                                class="button button-secondary"
+                                            >
+                                                <?php
+                                                echo !empty($boleto['nfe_pdf_path'])
+                                                    ? 'Substituir NFe'
+                                                    : 'Anexar NFe';
+                                                ?>
+                                            </button>
+                                        </p>
+
+                                        <small>
+                                            Somente PDF, máximo de 10 MB.
+                                        </small>
+                                    </form>
+                                </td>
+
                                 <td>
                                     <?php if (!empty($link_publico)) : ?>
                                         <a href="<?php echo esc_url($link_publico); ?>" target="_blank" rel="noopener">Abrir página</a><br>
@@ -1700,4 +1869,426 @@ class PBB_Admin
 
         return round((float)$value, 2);
     }
+
+    public static function handle_upload_nfe(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(
+                'Você não possui permissão para anexar notas fiscais.',
+                'Acesso negado',
+                [
+                    'response' => 403,
+                ]
+            );
+        }
+
+        $boleto_id = absint(
+            $_POST['boleto_id'] ?? 0
+        );
+
+        if ($boleto_id <= 0) {
+            self::set_notice(
+                'Identificador do boleto inválido.',
+                'error'
+            );
+
+            wp_safe_redirect(
+                admin_url('admin.php?page=pbb-generate')
+            );
+
+            exit;
+        }
+
+        check_admin_referer(
+            'pbb_upload_nfe_' . $boleto_id
+        );
+
+        try {
+            $repo = new PBB_Boletos_Repository();
+            $boleto = $repo->get_by_id($boleto_id);
+
+            if (!$boleto) {
+                throw new Exception(
+                    'Boleto não encontrado.'
+                );
+            }
+
+            if (
+                empty($_FILES['nfe_pdf'])
+                || !is_array($_FILES['nfe_pdf'])
+            ) {
+                throw new Exception(
+                    'Selecione o arquivo PDF da nota fiscal.'
+                );
+            }
+
+            $arquivo = $_FILES['nfe_pdf'];
+
+            if (
+                !isset($arquivo['error'])
+                || (int)$arquivo['error'] !== UPLOAD_ERR_OK
+            ) {
+                throw new Exception(
+                    'Falha no envio do arquivo da nota fiscal.'
+                );
+            }
+
+            /*
+            * Limite inicial: 10 MB.
+            */
+            $tamanho_maximo = 10 * 1024 * 1024;
+
+            if (
+                empty($arquivo['size'])
+                || (int)$arquivo['size'] > $tamanho_maximo
+            ) {
+                throw new Exception(
+                    'O PDF da nota fiscal deve possuir no máximo 10 MB.'
+                );
+            }
+
+            $verificacao = wp_check_filetype_and_ext(
+                (string)$arquivo['tmp_name'],
+                (string)$arquivo['name'],
+                [
+                    'pdf' => 'application/pdf',
+                ]
+            );
+
+            if (
+                ($verificacao['ext'] ?? '') !== 'pdf'
+                || ($verificacao['type'] ?? '') !== 'application/pdf'
+            ) {
+                throw new Exception(
+                    'O arquivo selecionado não é um PDF válido.'
+                );
+            }
+
+            /*
+            * Confirma a assinatura binária "%PDF-".
+            */
+            $handle = fopen(
+                (string)$arquivo['tmp_name'],
+                'rb'
+            );
+
+            if ($handle === false) {
+                throw new Exception(
+                    'Não foi possível validar o arquivo PDF.'
+                );
+            }
+
+            $assinatura = fread($handle, 5);
+            fclose($handle);
+
+            if ($assinatura !== '%PDF-') {
+                throw new Exception(
+                    'O arquivo não possui uma estrutura PDF válida.'
+                );
+            }
+
+            $upload_dir = wp_upload_dir();
+
+            if (!empty($upload_dir['error'])) {
+                throw new Exception(
+                    'Diretório de uploads indisponível: '
+                    . $upload_dir['error']
+                );
+            }
+
+            $diretorio = trailingslashit(
+                $upload_dir['basedir']
+            ) . 'banrisul-boletos/notas-fiscais';
+
+            if (
+                !wp_mkdir_p($diretorio)
+                && !is_dir($diretorio)
+            ) {
+                throw new Exception(
+                    'Não foi possível criar o diretório das notas fiscais.'
+                );
+            }
+
+            $arquivo_index = trailingslashit(
+                $diretorio
+            ) . 'index.php';
+
+            if (!is_file($arquivo_index)) {
+                file_put_contents(
+                    $arquivo_index,
+                    "<?php\n"
+                    . "if (!defined('ABSPATH')) {\n"
+                    . "    exit;\n"
+                    . "}\n"
+                );
+            }
+
+            $arquivo_htaccess = trailingslashit(
+                $diretorio
+            ) . '.htaccess';
+
+            if (!is_file($arquivo_htaccess)) {
+                file_put_contents(
+                    $arquivo_htaccess,
+                    "Options -Indexes\n"
+                    . "<FilesMatch \"\\.(pdf)$\">\n"
+                    . "    Require all denied\n"
+                    . "</FilesMatch>\n"
+                );
+            }
+
+            $nome_original = sanitize_file_name(
+                (string)$arquivo['name']
+            );
+
+            $nome_armazenado = sprintf(
+                'nfe-boleto-%d-%s.pdf',
+                $boleto_id,
+                wp_generate_password(
+                    16,
+                    false,
+                    false
+                )
+            );
+
+            $caminho_destino = trailingslashit(
+                $diretorio
+            ) . $nome_armazenado;
+
+            if (
+                !move_uploaded_file(
+                    (string)$arquivo['tmp_name'],
+                    $caminho_destino
+                )
+            ) {
+                throw new Exception(
+                    'Não foi possível armazenar a nota fiscal.'
+                );
+            }
+
+            $hash = hash_file(
+                'sha256',
+                $caminho_destino
+            );
+
+            if ($hash === false) {
+                wp_delete_file($caminho_destino);
+
+                throw new Exception(
+                    'Não foi possível validar a integridade da nota fiscal.'
+                );
+            }
+
+            /*
+            * Remove o PDF anterior somente depois
+            * que o novo arquivo já foi validado.
+            */
+            $caminho_anterior = (string)(
+                $boleto['nfe_pdf_path'] ?? ''
+            );
+
+            $repo->update_nfe(
+                $boleto_id,
+                $caminho_destino,
+                $nome_original,
+                $hash
+            );
+
+            if (
+                $caminho_anterior !== ''
+                && $caminho_anterior !== $caminho_destino
+                && is_file($caminho_anterior)
+            ) {
+                wp_delete_file($caminho_anterior);
+            }
+
+            self::set_notice(
+                'Nota fiscal anexada com sucesso.',
+                'success'
+            );
+        } catch (Throwable $e) {
+            self::set_notice(
+                'Erro ao anexar nota fiscal: '
+                . $e->getMessage(),
+                'error'
+            );
+        }
+
+        wp_safe_redirect(
+            admin_url('admin.php?page=pbb-generate')
+        );
+
+        exit;
+    }
+
+    public static function handle_download_nfe(): void
+    {
+        $invoice_id = absint(
+            $_GET['invoice_id'] ?? 0
+        );
+
+        $token = sanitize_text_field(
+            wp_unslash(
+                (string)($_GET['token'] ?? '')
+            )
+        );
+
+        if (
+            $invoice_id <= 0
+            || $token === ''
+        ) {
+            status_header(400);
+            exit('Dados de acesso inválidos.');
+        }
+
+        try {
+            $repo = new PBB_Boletos_Repository();
+
+            $boleto = $repo->get_by_invoice_id(
+                $invoice_id
+            );
+
+            if (!$boleto) {
+                throw new Exception(
+                    'Cobrança não encontrada.'
+                );
+            }
+
+            $token_salvo = (string)(
+                $boleto['propovoice_invoice_token']
+                ?? ''
+            );
+
+            if (
+                $token_salvo === ''
+                || !hash_equals(
+                    $token_salvo,
+                    $token
+                )
+            ) {
+                status_header(403);
+                exit('Acesso não autorizado.');
+            }
+
+            $caminho = (string)(
+                $boleto['nfe_pdf_path'] ?? ''
+            );
+
+            $hash_salvo = (string)(
+                $boleto['nfe_pdf_hash'] ?? ''
+            );
+
+            if (
+                $caminho === ''
+                || !is_file($caminho)
+                || !is_readable($caminho)
+            ) {
+                throw new Exception(
+                    'Nota fiscal indisponível.'
+                );
+            }
+
+            /*
+            * Garante que o arquivo está dentro
+            * do diretório privado esperado.
+            */
+            $upload_dir = wp_upload_dir();
+
+            $diretorio_permitido = realpath(
+                trailingslashit(
+                    $upload_dir['basedir']
+                ) . 'banrisul-boletos/notas-fiscais'
+            );
+
+            $caminho_real = realpath($caminho);
+
+            if (
+                $diretorio_permitido === false
+                || $caminho_real === false
+                || strpos(
+                    $caminho_real,
+                    trailingslashit(
+                        $diretorio_permitido
+                    )
+                ) !== 0
+            ) {
+                status_header(403);
+                exit('Arquivo fora do diretório permitido.');
+            }
+
+            /*
+            * Confere se o arquivo não foi alterado
+            * depois do upload.
+            */
+            if ($hash_salvo !== '') {
+                $hash_atual = hash_file(
+                    'sha256',
+                    $caminho_real
+                );
+
+                if (
+                    $hash_atual === false
+                    || !hash_equals(
+                        $hash_salvo,
+                        $hash_atual
+                    )
+                ) {
+                    throw new Exception(
+                        'Falha na integridade da nota fiscal.'
+                    );
+                }
+            }
+
+            $nome_download = sanitize_file_name(
+                (string)(
+                    $boleto['nfe_pdf_nome']
+                    ?? 'nota-fiscal.pdf'
+                )
+            );
+
+            if (
+                strtolower(
+                    pathinfo(
+                        $nome_download,
+                        PATHINFO_EXTENSION
+                    )
+                ) !== 'pdf'
+            ) {
+                $nome_download .= '.pdf';
+            }
+
+            nocache_headers();
+
+            header(
+                'Content-Type: application/pdf'
+            );
+
+            header(
+                'Content-Disposition: inline; filename="'
+                . $nome_download
+                . '"'
+            );
+
+            header(
+                'Content-Length: '
+                . filesize($caminho_real)
+            );
+
+            header(
+                'X-Content-Type-Options: nosniff'
+            );
+
+            readfile($caminho_real);
+            exit;
+        } catch (Throwable $e) {
+            error_log(
+                'PBB NFe: erro no download: '
+                . $e->getMessage()
+            );
+
+            status_header(404);
+            exit('Nota fiscal não encontrada.');
+        }
+    }
+
 }

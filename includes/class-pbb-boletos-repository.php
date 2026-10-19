@@ -447,4 +447,93 @@ class PBB_Boletos_Repository
             ? $result
             : null;
     }
+
+    public function update_nfe(
+        int $boleto_id,
+        string $nfe_pdf_path,
+        string $nfe_pdf_nome,
+        string $nfe_pdf_hash
+    ): void {
+        global $wpdb;
+
+        $boleto_id = absint($boleto_id);
+
+        if ($boleto_id <= 0) {
+            throw new Exception(
+                'Identificador do boleto inválido.'
+            );
+        }
+
+        if (
+            $nfe_pdf_path === ''
+            || $nfe_pdf_nome === ''
+            || $nfe_pdf_hash === ''
+        ) {
+            throw new Exception(
+                'Dados da nota fiscal incompletos.'
+            );
+        }
+
+        $updated = $wpdb->update(
+            $this->table,
+            [
+                'nfe_pdf_path' => $nfe_pdf_path,
+                'nfe_pdf_nome' => $nfe_pdf_nome,
+                'nfe_pdf_hash' => $nfe_pdf_hash,
+                'nfe_uploaded_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql'),
+            ],
+            [
+                'id' => $boleto_id,
+            ],
+            [
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+                '%s',
+            ],
+            [
+                '%d',
+            ]
+        );
+
+        if ($updated === false) {
+            throw new Exception(
+                'Erro ao vincular a nota fiscal: '
+                . $wpdb->last_error
+            );
+        }
+    }
+
+    public function clear_nfe(int $boleto_id): void
+    {
+        global $wpdb;
+
+        $updated = $wpdb->update(
+            $this->table,
+            [
+                'nfe_pdf_path' => null,
+                'nfe_pdf_nome' => null,
+                'nfe_pdf_hash' => null,
+                'nfe_uploaded_at' => null,
+                'updated_at' => current_time('mysql'),
+            ],
+            [
+                'id' => absint($boleto_id),
+            ],
+            null,
+            [
+                '%d',
+            ]
+        );
+
+        if ($updated === false) {
+            throw new Exception(
+                'Erro ao remover o vínculo da nota fiscal: '
+                . $wpdb->last_error
+            );
+        }
+    }
+
 }

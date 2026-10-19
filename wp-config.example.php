@@ -5,6 +5,7 @@
  * Copie estas constantes para o wp-config.php real da instalação.
  * Nunca preencha credenciais reais neste arquivo versionado.
  */
+
 define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 define('WP_DEBUG_DISPLAY', false);
