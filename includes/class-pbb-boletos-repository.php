@@ -48,6 +48,20 @@ class PBB_Boletos_Repository
             'status_local' => sanitize_text_field((string)($data['status_local'] ?? 'criado')),
             'payload_registro' => $this->json_or_null($data['payload_registro'] ?? null),
             'payload_emissao' => $this->json_or_null($data['payload_emissao'] ?? null),
+            'payload_envio' => $this->json_or_null($data['payload_envio'] ?? null),
+
+            'juros_mensal_percentual' => isset($data['juros_mensal_percentual'])
+                ? (float)$data['juros_mensal_percentual']
+                : null,
+
+            'multa_percentual' => isset($data['multa_percentual'])
+                ? (float)$data['multa_percentual']
+                : null,
+
+            'baixa_dias' => isset($data['baixa_dias'])
+                ? absint($data['baixa_dias'])
+                : null,
+
             'updated_at' => current_time('mysql'),
         ];
 

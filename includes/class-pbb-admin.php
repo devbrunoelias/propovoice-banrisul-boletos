@@ -538,6 +538,90 @@ class PBB_Admin
                             </p>
                         </td>
                     </tr>
+
+                    <tr>
+                        <th scope="row">
+                            Encargos após o vencimento
+                        </th>
+
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="aplicar_juros"
+                                        value="1"
+                                        checked
+                                    >
+                                    Aplicar juros mensais
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="juros_mensal_percentual"
+                                    value="5,20"
+                                    size="6"
+                                    inputmode="decimal"
+                                >
+                                %
+                            </fieldset>
+
+                            <br>
+
+                            <fieldset>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="aplicar_multa"
+                                        value="1"
+                                        checked
+                                    >
+                                    Aplicar multa
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="multa_percentual"
+                                    value="2,0"
+                                    size="6"
+                                    inputmode="decimal"
+                                >
+                                %
+                            </fieldset>
+
+                            <br>
+
+                            <fieldset>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="aplicar_baixa"
+                                        value="1"
+                                        checked
+                                    >
+                                    Baixar/devolver automaticamente após
+                                </label>
+
+                                <input
+                                    type="number"
+                                    name="baixa_dias"
+                                    value="5"
+                                    min="1"
+                                    max="99"
+                                    step="1"
+                                    style="width: 75px;"
+                                >
+                                dias do vencimento
+                            </fieldset>
+
+                            <p class="description">
+                                Juros e multa começam no dia seguinte ao vencimento.
+                                O boleto poderá ser baixado automaticamente após o
+                                prazo informado.
+                            </p>
+                        </td>
+                    </tr>
+
                     <tr>
                         <th scope="row">
                             <label for="invoice_id">Número ou ID da Invoice PROPOVOICE</label>
@@ -768,6 +852,12 @@ class PBB_Admin
 
         $invoice_id = absint($_POST['invoice_id'] ?? 0);
         $empresa_id = sanitize_key(wp_unslash($_POST['empresa_id'] ?? ''));
+        $aplicar_juros = !empty($_POST['aplicar_juros']);
+        $aplicar_multa = !empty($_POST['aplicar_multa']);
+        $aplicar_baixa = !empty($_POST['aplicar_baixa']);
+        $juros_mensal_percentual = self::parse_decimal_input($_POST['juros_mensal_percentual'] ?? '0');
+        $multa_percentual = self::parse_decimal_input($_POST['multa_percentual'] ?? '0');
+        $baixa_dias = absint($_POST['baixa_dias'] ?? 0);
 
         if (!$invoice_id) {
             self::set_notice(
@@ -781,20 +871,57 @@ class PBB_Admin
             exit;
         }
 
-        if (!PBB_Empresas_Config::exists($empresa_id)) {
-            self::set_notice(
-                'Selecione uma empresa emissora válida.',
-                'error'
-            );
-
-            wp_safe_redirect(
-                admin_url('admin.php?page=pbb-generate')
-            );
-
-            exit;
-        }
-
         try {
+            if (!PBB_Empresas_Config::exists($empresa_id)) {
+                self::set_notice(
+                    'Selecione uma empresa emissora válida.',
+                    'error'
+                );
+
+                wp_safe_redirect(
+                    admin_url('admin.php?page=pbb-generate')
+                );
+
+                exit;
+            }
+
+            if (
+                $aplicar_juros
+                && $juros_mensal_percentual <= 0
+            ) {
+                throw new Exception(
+                    'Informe um percentual de juros maior que zero.'
+                );
+            }
+
+            if (
+                $aplicar_multa
+                && $multa_percentual <= 0
+            ) {
+                throw new Exception(
+                    'Informe um percentual de multa maior que zero.'
+                );
+            }
+
+            if ($aplicar_multa) {
+                $multa_percentual = round(
+                    $multa_percentual,
+                    1
+                );
+            }
+
+            if (
+                $aplicar_baixa
+                && (
+                    $baixa_dias < 1
+                    || $baixa_dias > 99
+                )
+            ) {
+                throw new Exception(
+                    'O prazo de baixa deve ficar entre 1 e 99 dias.'
+                );
+            }
+
             $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
             $empresa = PBB_Empresas_Config::validate_for_environment($empresa_id, $ambiente);
             $propovoice = new PBB_Propovoice_API();
@@ -853,7 +980,20 @@ class PBB_Admin
                 throw new Exception('Contato do cliente não encontrado ou inválido.');
             }
 
-            $payload = self::build_banrisul_payload($invoice, $contact);
+            $encargos = [
+                'aplicar_juros' => $aplicar_juros,
+                'juros_mensal_percentual' => (
+                    $juros_mensal_percentual
+                ),
+
+                'aplicar_multa' => $aplicar_multa,
+                'multa_percentual' => $multa_percentual,
+
+                'aplicar_baixa' => $aplicar_baixa,
+                'baixa_dias' => $baixa_dias,
+            ];
+
+            $payload = self::build_banrisul_payload($invoice, $contact, $encargos);
             $registro = $banrisul->registrar_boleto($payload);
             $titulo_registro = $registro['titulo'] ?? [];
 
@@ -934,6 +1074,10 @@ class PBB_Admin
                 'payload_registro' => $registro,
                 'payload_emissao' => $emissao,
                 'payload_consulta' => null,
+                'payload_envio' => $payload,
+                'juros_mensal_percentual' => ($aplicar_juros ? $juros_mensal_percentual : null),
+                'multa_percentual' => ($aplicar_multa ? $multa_percentual : null),
+                'baixa_dias' => ($aplicar_baixa ? $baixa_dias : null),
             ]);
 
             self::set_notice('Boleto gerado com sucesso. Linha digitável: ' . ($titulo_registro['linha_digitavel'] ?? ''), 'success');
@@ -1182,7 +1326,7 @@ class PBB_Admin
         return null;
     }
 
-    private static function build_banrisul_payload(array $invoice, array $contact): array
+    private static function build_banrisul_payload(array $invoice, array $contact, array $encargos): array
     {
         self::validate_invoice_and_contact($invoice, $contact);
 
@@ -1190,6 +1334,55 @@ class PBB_Admin
         $ambiente_banrisul = ($ambiente_plugin === 'producao' ? 'P' : 'T');
         $documento = self::only_digits((string)$contact['org_name']);
         $cep = self::only_digits((string)$contact['zip']);
+
+        $instrucoes = [];
+
+        /*
+        * Juros é obrigatório.
+        * Quando desmarcado, envia código 3: isento.
+        */
+        if (!empty($encargos['aplicar_juros'])) {
+            $instrucoes['juros'] = [
+                'codigo' => 2,
+                'taxa' => number_format(
+                    (float)$encargos['juros_mensal_percentual'],
+                    2,
+                    '.',
+                    ''
+                ),
+            ];
+        } else {
+            $instrucoes['juros'] = [
+                'codigo' => 3,
+            ];
+        }
+
+        /*
+        * Multa percentual.
+        */
+        if (!empty($encargos['aplicar_multa'])) {
+            $instrucoes['multa'] = [
+                'codigo' => 2,
+                'taxa' => number_format(
+                    (float)$encargos['multa_percentual'],
+                    1,
+                    '.',
+                    ''
+                ),
+            ];
+        }
+
+        /*
+        * Baixa/devolução automática.
+        */
+        if (!empty($encargos['aplicar_baixa'])) {
+            $instrucoes['baixa'] = [
+                'codigo' => 1,
+                'prazo' => absint(
+                    $encargos['baixa_dias']
+                ),
+            ];
+        }
 
         return [
             'ambiente' => $ambiente_banrisul,
@@ -1202,18 +1395,16 @@ class PBB_Admin
                 'pagador' => [
                     'tipo_pessoa' => self::detect_tipo_pessoa($documento),
                     'cpf_cnpj' => $documento,
-                    'nome' => (string)$contact['first_name'],
+                    'nome' => mb_substr(preg_replace('/\s+/', ' ', trim((string)$contact['first_name'])), 0, 40, 'UTF-8'),
                     'endereco' => (string)$contact['address'],
                     'cep' => $cep,
                     'cidade' => (string)$contact['city'],
                     'uf' => (string)$contact['region'],
                     'aceite' => get_option('pbb_boleto_aceite', 'A'),
                 ],
-                'instrucoes' => [
-                    'juros' => [
-                        'codigo' => (int)get_option('pbb_boleto_juros_codigo', '3'),
-                    ],
-                ],
+
+                'instrucoes' => $instrucoes,
+
                 'pag_parcial' => [
                     'autoriza' => (int)get_option('pbb_boleto_pag_parcial_autoriza', '1'),
                     'codigo' => (int)get_option('pbb_boleto_pag_parcial_codigo', '3'),
@@ -1486,5 +1677,27 @@ class PBB_Admin
         delete_transient('pbb_admin_notice');
         $type = $notice['type'] === 'error' ? 'notice-error' : 'notice-success';
         echo '<div class="notice ' . esc_attr($type) . ' is-dismissible"><p>' . esc_html($notice['message']) . '</p></div>';
+    }
+
+    private static function parse_decimal_input($value): float
+    {
+        $value = sanitize_text_field(
+            wp_unslash((string)$value)
+        );
+
+        $value = str_replace(
+            [' ', ','],
+            ['', '.'],
+            $value
+        );
+
+        if (
+            $value === ''
+            || !is_numeric($value)
+        ) {
+            return 0.0;
+        }
+
+        return round((float)$value, 2);
     }
 }
