@@ -19,6 +19,8 @@ class PBB_Activator
             propovoice_invoice_num VARCHAR(50) NOT NULL,
             propovoice_invoice_token VARCHAR(120) NULL,
             propovoice_contact_id BIGINT UNSIGNED NULL,
+            empresa_id VARCHAR(50) NULL,
+            beneficiario_codigo VARCHAR(30) NULL,
             client_name VARCHAR(255) NULL,
             client_document VARCHAR(20) NULL,
             client_email VARCHAR(190) NULL,

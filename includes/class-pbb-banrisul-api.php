@@ -11,36 +11,141 @@ class PBB_Banrisul_API
     private string $client_id;
     private string $client_secret;
     private string $beneficiario;
+    private string $empresa_id;
 
-    public function __construct()
+    private array $empresa;
+
+    public function __construct(string $empresa_id = 'empresa_1')
     {
-        $this->base_url = rtrim((string) get_option('pbb_banrisul_base_url'), '/');
-        $this->oauth_url = (string) get_option('pbb_banrisul_oauth_url');
-        $this->beneficiario = (string) get_option('pbb_banrisul_beneficiario');
-        $ambiente = get_option('pbb_banrisul_ambiente','sandbox');
+    $this->empresa_id = sanitize_key($empresa_id);
 
-        if ($ambiente === 'producao') {
-            $this->client_id = defined('PBB_BANRISUL_PRODUCAO_CLIENT_ID')
-                ? (string) PBB_BANRISUL_PRODUCAO_CLIENT_ID
+    $this->empresa = PBB_Empresas_Config::get(
+        $this->empresa_id
+    );
+
+    $ambiente = (string)get_option(
+        'pbb_banrisul_ambiente',
+        'sandbox'
+    );
+
+    $this->configure_environment($ambiente);
+    }
+
+    private function configure_environment(string $ambiente): void 
+    {
+        if ($ambiente === 'sandbox') {
+            $this->client_id = defined(
+                'PBB_BANRISUL_SANDBOX_CLIENT_ID'
+            )
+                ? (string)PBB_BANRISUL_SANDBOX_CLIENT_ID
                 : '';
 
-            $this->client_secret = defined('PBB_BANRISUL_PRODUCAO_CLIENT_SECRET')
-                ? (string) PBB_BANRISUL_PRODUCAO_CLIENT_SECRET
-                : '';
-        } else {
-            $this->client_id = defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
-                ? (string) PBB_BANRISUL_SANDBOX_CLIENT_ID
+            $this->client_secret = defined(
+                'PBB_BANRISUL_SANDBOX_CLIENT_SECRET'
+            )
+                ? (string)PBB_BANRISUL_SANDBOX_CLIENT_SECRET
                 : '';
 
-            $this->client_secret = defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
-                ? (string) PBB_BANRISUL_SANDBOX_CLIENT_SECRET
-                : '';    
-        }   
-        
+            $this->beneficiario = (string)get_option(
+                'pbb_banrisul_beneficiario',
+                '0010000001088'
+            );
+
+            $this->oauth_url = (string)get_option(
+                'pbb_banrisul_oauth_url',
+                ''
+            );
+
+            $this->base_url = rtrim(
+                (string)get_option(
+                    'pbb_banrisul_base_url',
+                    'https://apidev.banrisul.com.br/cobranca/v1'
+                ),
+                '/'
+            );
+
+            return;
+        }
+
+        if (
+            !in_array(
+                $ambiente,
+                ['homologacao', 'producao'],
+                true
+            )
+        ) {
+            throw new Exception(
+                'Ambiente Banrisul inválido.'
+            );
+        }
+
+        $this->client_id = (string)(
+            $this->empresa['producao_client_id'] ?? ''
+        );
+
+        $this->client_secret = (string)(
+            $this->empresa['producao_client_secret'] ?? ''
+        );
+
+        $this->beneficiario = (string)(
+            $this->empresa['beneficiario_codigo'] ?? ''
+        );
+
+        $this->oauth_url = (string)get_option(
+            'pbb_banrisul_producao_oauth_url',
+            ''
+        );
+
+        $this->base_url = rtrim(
+            (string)get_option(
+                'pbb_banrisul_producao_base_url',
+                ''
+            ),
+            '/'
+        );
+
+        if (
+            $this->client_id === ''
+            || $this->client_secret === ''
+        ) {
+            throw new Exception(
+                'Credenciais produtivas não configuradas para '
+                . (
+                    $this->empresa['nome']
+                    ?? $this->empresa_id
+                )
+                . '.'
+            );
+        }
+
+        if ($this->beneficiario === '') {
+            throw new Exception(
+                'Código de Beneficiário não configurado para '
+                . (
+                    $this->empresa['nome']
+                    ?? $this->empresa_id
+                )
+                . '.'
+            );
+        }
+
+        if (
+            $this->oauth_url === ''
+            || $this->base_url === ''
+        ) {
+            throw new Exception(
+                'URLs produtivas do Banrisul não configuradas.'
+            );
+        }
+    }
+
+    public function get_beneficiario(): string
+    {
+        return $this->beneficiario;
     }
 
     private function get_token(): string
-{
+    {
     $this->validate_settings();
 
     delete_transient('pbb_banrisul_access_token');
@@ -67,14 +172,14 @@ class PBB_Banrisul_API
     }
 
     return (string) $data['access_token'];
-}
+    }
 
     private function get_ambiente_banrisul(): string
-{
+    {
     $ambiente_plugin = get_option('pbb_banrisul_ambiente', 'sandbox');
 
     return $ambiente_plugin === 'producao' ? 'P' : 'T';
-}
+    }
 
     public function registrar_boleto(array $payload): array
     {

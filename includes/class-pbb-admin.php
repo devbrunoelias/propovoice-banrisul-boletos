@@ -58,6 +58,27 @@ class PBB_Admin
         $invoice_id = isset($_GET['invoice_id']) ? absint($_GET['invoice_id']) : 0;
         $token = isset($_GET['token']) ? sanitize_text_field(wp_unslash($_GET['token'])) : '';
 
+        $empresa_nome = '';
+
+        $empresa_id_boleto = sanitize_key(
+            (string)($boleto['empresa_id'] ?? '')
+        );
+
+        if (
+            $empresa_id_boleto !== ''
+            && PBB_Empresas_Config::exists(
+                $empresa_id_boleto
+            )
+        ) {
+            $empresa_config = PBB_Empresas_Config::get(
+                $empresa_id_boleto
+            );
+
+            $empresa_nome = (string)(
+                $empresa_config['nome'] ?? ''
+            );
+        }
+
         if (!$invoice_id || !$token) {
             return '<div class="banrisul-boleto"><p>Boleto não localizado. Parâmetros ausentes.</p></div>';
         }
@@ -99,6 +120,11 @@ class PBB_Admin
                 <h2 style="margin-top: 0;">Boleto Banrisul</h2>
 
                 <p><strong>Invoice:</strong> <?php echo esc_html($boleto['propovoice_invoice_num'] ?? ''); ?></p>
+
+                <?php if ($empresa_nome !== '') : ?>
+                    <p><strong>Empresa emissora:</strong><?php echo esc_html($empresa_nome); ?></p>
+                <?php endif; ?>
+
                 <p><strong>Cliente:</strong> <?php echo esc_html($boleto['client_name'] ?? ''); ?></p>
                 <p><strong>Valor:</strong> R$ <?php echo esc_html($boleto['valor_nominal'] ?? ''); ?></p>
                 <p><strong>Vencimento:</strong> <?php echo esc_html($boleto['data_vencimento'] ?? ''); ?></p>
@@ -215,6 +241,8 @@ class PBB_Admin
         $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
         $base_url = get_option('pbb_banrisul_base_url', 'https://apidev.banrisul.com.br/cobranca/v1');
         $oauth_url = get_option('pbb_banrisul_oauth_url', '');
+        $producao_base_url = get_option('pbb_banrisul_producao_base_url', '');
+        $producao_oauth_url = get_option('pbb_banrisul_producao_oauth_url', '');
         $beneficiario = get_option('pbb_banrisul_beneficiario', '0010000001088');
         $especie = get_option('pbb_boleto_especie', '99');
         $aceite = get_option('pbb_boleto_aceite', 'A');
@@ -235,9 +263,69 @@ class PBB_Admin
                         <th scope="row"><label for="pbb_banrisul_ambiente">Ambiente</label></th>
                         <td>
                             <select name="pbb_banrisul_ambiente" id="pbb_banrisul_ambiente">
-                                <option value="sandbox" <?php selected($ambiente, 'sandbox'); ?>>Sandbox</option>
-                                <option value="producao" <?php selected($ambiente, 'producao'); ?>>Produção</option>
+                                <option value="sandbox" <?php selected($ambiente, 'sandbox'); ?> >
+                                    Sandbox
+                                </option>
+
+                                <option value="homologacao" <?php selected($ambiente, 'homologacao'); ?> >
+                                    Homologação
+                                </option>
+
+                                <option value="producao" <?php selected($ambiente, 'producao'); ?> >
+                                    Produção
+                                </option>
                             </select>
+
+                            <p class="description">
+                                Sandbox utiliza credenciais e URLs de teste.
+                                Homologação utiliza credenciais e URLs produtivas,
+                                mas envia ambiente T no registro.
+                                Produção envia ambiente P.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                    <th scope="row"><label for="pbb_banrisul_producao_oauth_url">URL OAuth2 de Homologação/Produção</label></th>
+                        <td>
+                            <input
+                                type="url"
+                                name="pbb_banrisul_producao_oauth_url"
+                                id="pbb_banrisul_producao_oauth_url"
+                                class="regular-text"
+                                value="<?php
+                                    echo esc_attr($producao_oauth_url);
+                                ?>"
+                            >
+
+                            <p class="description">
+                                Utilizada nos ambientes Homologação e Produção.
+                                Preencher somente com a URL oficial do Banrisul.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="pbb_banrisul_producao_base_url">
+                                URL Base API de Homologação/Produção
+                            </label>
+                        </th>
+
+                        <td>
+                            <input
+                                type="url"
+                                name="pbb_banrisul_producao_base_url"
+                                id="pbb_banrisul_producao_base_url"
+                                class="regular-text"
+                                value="<?php
+                                    echo esc_attr($producao_base_url);
+                                ?>"
+                            >
+
+                            <p class="description">
+                                URL base produtiva da API de Cobrança.
+                                Não incluir barra no final.
+                            </p>
                         </td>
                     </tr>
                 </table>
@@ -248,21 +336,33 @@ class PBB_Admin
                         <th scope="row">Credenciais</th>
                         <td>
                             <?php
-                            $banrisul_configurado = false;
+                                $banrisul_configurado = false;
+                                $empresa_1_configurada = false;
+                                $empresa_2_configurada = false;
 
-                            if ($ambiente === 'producao') {
-                                $banrisul_configurado =
-                                    defined('PBB_BANRISUL_PRODUCAO_CLIENT_ID')
-                                    && PBB_BANRISUL_PRODUCAO_CLIENT_ID !== ''
-                                    && defined('PBB_BANRISUL_PRODUCAO_CLIENT_SECRET')
-                                    && PBB_BANRISUL_PRODUCAO_CLIENT_SECRET !== '';
-                            } else {
-                                $banrisul_configurado =
-                                    defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
-                                    && PBB_BANRISUL_SANDBOX_CLIENT_ID !== ''
-                                    && defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
-                                    && PBB_BANRISUL_SANDBOX_CLIENT_SECRET !== '';
-                            }
+                                if ($ambiente === 'sandbox') {
+                                    $banrisul_configurado =
+                                        defined('PBB_BANRISUL_SANDBOX_CLIENT_ID')
+                                        && PBB_BANRISUL_SANDBOX_CLIENT_ID !== ''
+                                        && defined('PBB_BANRISUL_SANDBOX_CLIENT_SECRET')
+                                        && PBB_BANRISUL_SANDBOX_CLIENT_SECRET !== '';
+                                } else {
+                                    $empresa_1_configurada =
+                                        defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_ID')
+                                        && PBB_EMPRESA_1_PRODUCAO_CLIENT_ID !== ''
+                                        && defined('PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET')
+                                        && PBB_EMPRESA_1_PRODUCAO_CLIENT_SECRET !== '';
+
+                                    $empresa_2_configurada =
+                                        defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_ID')
+                                        && PBB_EMPRESA_2_PRODUCAO_CLIENT_ID !== ''
+                                        && defined('PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET')
+                                        && PBB_EMPRESA_2_PRODUCAO_CLIENT_SECRET !== '';
+
+                                    $banrisul_configurado =
+                                        $empresa_1_configurada
+                                        && $empresa_2_configurada;
+                                }
                             ?>
 
                             <?php if ($banrisul_configurado) : ?>
@@ -355,7 +455,14 @@ class PBB_Admin
 
         check_admin_referer('pbb_save_settings');
 
-        update_option('pbb_banrisul_ambiente', sanitize_text_field($_POST['pbb_banrisul_ambiente'] ?? 'sandbox'));
+        $ambiente = sanitize_key(wp_unslash($_POST['pbb_banrisul_ambiente'] ?? 'sandbox'));
+
+        $ambientes_permitidos = ['sandbox', 'homologacao', 'producao',];
+
+        if (!in_array($ambiente, $ambientes_permitidos, true)) {$ambiente = 'sandbox';}
+
+        update_option('pbb_banrisul_ambiente', $ambiente);
+        
         update_option('pbb_banrisul_oauth_url', esc_url_raw($_POST['pbb_banrisul_oauth_url'] ?? ''));
         update_option('pbb_banrisul_base_url', esc_url_raw($_POST['pbb_banrisul_base_url'] ?? ''));
         update_option('pbb_banrisul_beneficiario', sanitize_text_field($_POST['pbb_banrisul_beneficiario'] ?? ''));
@@ -364,6 +471,10 @@ class PBB_Admin
         update_option('pbb_boleto_juros_codigo', sanitize_text_field($_POST['pbb_boleto_juros_codigo'] ?? '3'));
         update_option('pbb_boleto_pag_parcial_autoriza', sanitize_text_field($_POST['pbb_boleto_pag_parcial_autoriza'] ?? '1'));
         update_option('pbb_boleto_pag_parcial_codigo', sanitize_text_field($_POST['pbb_boleto_pag_parcial_codigo'] ?? '3'));
+
+        update_option('pbb_banrisul_producao_oauth_url', esc_url_raw(wp_unslash($_POST['pbb_banrisul_producao_oauth_url'] ?? '')));
+
+        update_option('pbb_banrisul_producao_base_url', untrailingslashit(esc_url_raw(wp_unslash($_POST['pbb_banrisul_producao_base_url'] ?? ''))));
 
         self::set_notice('Configurações salvas com sucesso.', 'success');
         wp_safe_redirect(admin_url('admin.php?page=pbb-settings'));
@@ -381,7 +492,9 @@ class PBB_Admin
 
         $repo = new PBB_Boletos_Repository();
         $boletos = $repo->list_recent(20);
+        $empresas = PBB_Empresas_Config::all();
         ?>
+
         <div class="wrap">
             <h1>Gerar Boleto Banrisul por Invoice</h1>
 
@@ -390,8 +503,43 @@ class PBB_Admin
                 <input type="hidden" name="action" value="pbb_generate_boleto">
 
                 <table class="form-table">
+                    
                     <tr>
-                        <th scope="row"><label for="invoice_id">ID da Invoice PROPOVOICE</label></th>
+                        <th scope="row">
+                            <label for="empresa_id">
+                                Empresa emissora
+                            </label>
+                        </th>
+
+                        <td>
+                            <select
+                                name="empresa_id"
+                                id="empresa_id"
+                                required
+                            >
+                                <option value="">
+                                    Selecione a empresa
+                                </option>
+
+                                <option value="empresa_1">
+                                    CATÂNIA COMUNICAÇÃO E MARKETING LTDA
+                                </option>
+
+                                <option value="empresa_2">
+                                    SITES E PRODUTOS WEB LTDA
+                                </option>
+                            </select>
+
+                            <p class="description">
+                                Selecione a empresa e o Código de Beneficiário
+                                que serão utilizados para registrar o boleto.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="invoice_id">ID da Invoice PROPOVOICE</label>
+                        </th>
                         <td>
                             <input type="number" name="invoice_id" id="invoice_id" class="regular-text" required>
                             <p class="description">Exemplo do seu teste: 2296.</p>
@@ -410,6 +558,7 @@ class PBB_Admin
                 <thead>
                     <tr>
                         <th>Invoice</th>
+                        <th>Empresa Emissora</th>
                         <th>Cliente</th>
                         <th>Valor</th>
                         <th>Vencimento</th>
@@ -424,7 +573,7 @@ class PBB_Admin
                 </thead>
                 <tbody>
                     <?php if (empty($boletos)) : ?>
-                        <tr><td colspan="11">Nenhum boleto gerado ainda.</td></tr>
+                        <tr><td colspan="12">Nenhum boleto gerado ainda.</td></tr>
                     <?php else : ?>
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
@@ -466,9 +615,47 @@ class PBB_Admin
                                     admin_url('admin-post.php')
                                 );
                             }
+
+                            $empresa_nome = 'Não informada';
+
+                            $empresa_id_boleto = sanitize_key(
+                                (string)($boleto['empresa_id'] ?? '')
+                            );
+
+                            if (
+                                $empresa_id_boleto !== ''
+                                && PBB_Empresas_Config::exists(
+                                    $empresa_id_boleto
+                                )
+                            ) {
+                                $empresa_config = PBB_Empresas_Config::get(
+                                    $empresa_id_boleto
+                                );
+
+                                $empresa_nome = (string)(
+                                    $empresa_config['nome']
+                                    ?? $empresa_id_boleto
+                                );
+                            }
+
                             ?>
                             <tr>
                                 <td><?php echo esc_html($boleto['propovoice_invoice_num']); ?></td>
+                                <td><?php echo esc_html($empresa_nome); ?>
+                                    <?php
+                                        if (!empty($boleto['beneficiario_codigo'])) :
+                                    ?>
+                                    <br>
+                                        <small>
+                                            Beneficiário:
+                                            <?php
+                                            echo esc_html(
+                                                $boleto['beneficiario_codigo']
+                                            );
+                                            ?>
+                                        </small>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo esc_html($boleto['client_name']); ?></td>
                                 <td><?php echo esc_html($boleto['valor_nominal']); ?></td>
                                 <td><?php echo esc_html($boleto['data_vencimento']); ?></td>
@@ -555,22 +742,50 @@ class PBB_Admin
         }
 
         check_admin_referer('pbb_generate_boleto');
+
         $invoice_id = absint($_POST['invoice_id'] ?? 0);
+        $empresa_id = sanitize_key(wp_unslash($_POST['empresa_id'] ?? ''));
 
         if (!$invoice_id) {
-            self::set_notice('Informe um ID de invoice válido.', 'error');
-            wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
+            self::set_notice(
+                'Informe um ID de invoice válido.',
+                'error');
+
+            wp_safe_redirect(
+                admin_url('admin.php?page=pbb-generate')
+                );
+            exit;
+        }
+
+        if (!PBB_Empresas_Config::exists($empresa_id)) {
+            self::set_notice(
+                'Selecione uma empresa emissora válida.',
+                'error'
+            );
+
+            wp_safe_redirect(
+                admin_url('admin.php?page=pbb-generate')
+            );
+
             exit;
         }
 
         try {
+            $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
+            $empresa = PBB_Empresas_Config::validate_for_environment($empresa_id, $ambiente);
             $propovoice = new PBB_Propovoice_API();
-            $banrisul = new PBB_Banrisul_API();
+            $banrisul = new PBB_Banrisul_API($empresa_id);
+
+            $beneficiario_codigo = $banrisul->get_beneficiario();
+
+            if ($beneficiario_codigo === '') {
+                throw new Exception(
+                    'Código de Beneficiário não configurado '
+                    . 'para a empresa selecionada.'
+                );
+            }
+
             $repo = new PBB_Boletos_Repository();
-            $ambiente = get_option(
-                'pbb_banrisul_ambiente',
-                'sandbox'
-            );
 
             $boleto_existente = $repo->get_by_invoice_id($invoice_id);
 
@@ -671,6 +886,8 @@ class PBB_Admin
                 'propovoice_invoice_num' => (string)($invoice['num'] ?? ''),
                 'propovoice_invoice_token' => (string)($invoice['token'] ?? ''),
                 'propovoice_contact_id' => $contact_id,
+                'empresa_id' => $empresa_id,
+                'beneficiario_codigo' => $beneficiario_codigo,
                 'client_name' => (string)($contact['first_name'] ?? ''),
                 'client_document' => self::only_digits((string)($contact['org_name'] ?? '')),
                 'client_email' => (string)($contact['email'] ?? ''),
@@ -701,7 +918,7 @@ class PBB_Admin
     }
 
     public static function handle_consultar_status(): void
-{
+    {
     if (!current_user_can('manage_options')) {
         wp_die('Sem permissão.');
     }
@@ -728,8 +945,27 @@ class PBB_Admin
             throw new Exception('Boleto sem código de barras para consulta.');
         }
 
-        $banrisul = new PBB_Banrisul_API();
-        $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
+        $ambiente = (string)get_option('pbb_banrisul_ambiente', 'sandbox');
+
+        $empresa_id = sanitize_key((string)($boleto['empresa_id'] ?? ''));
+
+        if ($empresa_id === '') {
+            if ($ambiente === 'sandbox') {
+                $empresa_id = 'empresa_1';
+            } else {
+                throw new Exception(
+                    'O boleto não possui empresa emissora vinculada.'
+                );
+            }
+        }
+
+        if (!PBB_Empresas_Config::exists($empresa_id)) {
+            throw new Exception(
+                'A empresa emissora vinculada ao boleto é inválida.'
+            );
+        }
+
+        $banrisul = new PBB_Banrisul_API($empresa_id);
 
         if ($ambiente === 'sandbox') {
             $codigo_consulta = '04191861100000150502100100000010000000024047';
@@ -763,7 +999,7 @@ class PBB_Admin
 
     wp_safe_redirect(admin_url('admin.php?page=pbb-generate'));
     exit;
-}
+    }
 
     public static function handle_download_boleto(): void
     {
@@ -888,7 +1124,7 @@ class PBB_Admin
         self::validate_invoice_and_contact($invoice, $contact);
 
         $ambiente_plugin = get_option('pbb_banrisul_ambiente', 'sandbox');
-        $ambiente_banrisul = $ambiente_plugin === 'producao' ? 'P' : 'T';
+        $ambiente_banrisul = ($ambiente_plugin === 'producao' ? 'P' : 'T');
         $documento = self::only_digits((string)$contact['org_name']);
         $cep = self::only_digits((string)$contact['zip']);
 
@@ -1123,6 +1359,20 @@ class PBB_Admin
             'pbb_banrisul_ambiente',
             'sandbox'
         );
+
+        if ($ambiente === 'homologacao') {
+            ?>
+            <div class="notice notice-warning">
+                <p>
+                    <strong>AMBIENTE DE HOMOLOGAÇÃO ATIVO.</strong>
+                    Serão utilizadas credenciais e URLs produtivas,
+                    mas o registro será enviado com ambiente T.
+                </p>
+            </div>
+            <?php
+
+            return;
+        }
 
         if ($ambiente === 'producao') {
             ?>

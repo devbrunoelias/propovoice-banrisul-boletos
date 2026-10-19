@@ -31,6 +31,8 @@ class PBB_Boletos_Repository
             'propovoice_invoice_num' => sanitize_text_field((string)($data['propovoice_invoice_num'] ?? '')),
             'propovoice_invoice_token' => sanitize_text_field((string)($data['propovoice_invoice_token'] ?? '')),
             'propovoice_contact_id' => absint($data['propovoice_contact_id'] ?? 0),
+            'empresa_id' => sanitize_key((string)($data['empresa_id'] ?? '')),
+            'beneficiario_codigo' => sanitize_text_field((string)($data['beneficiario_codigo'] ?? '')),
             'client_name' => sanitize_text_field((string)($data['client_name'] ?? '')),
             'client_document' => sanitize_text_field((string)($data['client_document'] ?? '')),
             'client_email' => sanitize_email((string)($data['client_email'] ?? '')),

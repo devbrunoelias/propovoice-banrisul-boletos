@@ -1,4 +1,4 @@
-    1.  Responder ao Banrisul solicitando uma aplicação para cada beneficiário.
+   ## 1.  Responder ao Banrisul solicitando uma aplicação para cada beneficiário.
     2.  Definir identificadores internos das duas empresas.
     3.  Adicionar empresa_id e beneficiario_codigo à tabela.
     4.  Criar a configuração centralizada das empresas.

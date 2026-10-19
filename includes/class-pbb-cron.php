@@ -27,44 +27,101 @@ class PBB_Cron
 
     public static function consultar_boletos(): void
     {
-        if (get_option('pbb_banrisul_ambiente', 'sandbox') !== 'producao') {
+        $ambiente = (string)get_option(
+            'pbb_banrisul_ambiente',
+            'sandbox'
+        );
+
+        if (
+            !in_array(
+                $ambiente,
+                ['homologacao', 'producao'],
+                true
+            )
+        ) {
             return;
         }
 
         try {
             $repo = new PBB_Boletos_Repository();
-            $banrisul = new PBB_Banrisul_API();
 
             $boletos = $repo->list_for_status_sync(50);
 
             foreach ($boletos as $boleto) {
-                if (
-                    empty($boleto['id'])
-                    || empty($boleto['codigo_barras'])
-                ) {
-                    continue;
-                }
-
                 try {
-                    $consulta = $banrisul->consultar_boleto_por_codigo_barras(
-                        (string) $boleto['codigo_barras']
+                    $boleto_id = absint(
+                        $boleto['id'] ?? 0
                     );
 
+                    $codigo_barras = (string)(
+                        $boleto['codigo_barras'] ?? ''
+                    );
+
+                    if (
+                        !$boleto_id
+                        || $codigo_barras === ''
+                    ) {
+                        continue;
+                    }
+
+                    $empresa_id = sanitize_key(
+                        (string)(
+                            $boleto['empresa_id'] ?? ''
+                        )
+                    );
+
+                    if ($empresa_id === '') {
+                        error_log(
+                            'PBB Cron: boleto '
+                            . $boleto_id
+                            . ' sem empresa emissora vinculada.'
+                        );
+
+                        continue;
+                    }
+
+                    if (
+                        !PBB_Empresas_Config::exists(
+                            $empresa_id
+                        )
+                    ) {
+                        error_log(
+                            'PBB Cron: empresa inválida no boleto '
+                            . $boleto_id
+                            . '.'
+                        );
+
+                        continue;
+                    }
+
+                    $banrisul = new PBB_Banrisul_API(
+                        $empresa_id
+                    );
+
+                    $consulta =
+                        $banrisul
+                            ->consultar_boleto_por_codigo_barras(
+                                $codigo_barras
+                            );
+
                     $repo->update_status_from_consulta(
-                        (int) $boleto['id'],
+                        $boleto_id,
                         $consulta
                     );
                 } catch (Throwable $e) {
                     error_log(
-                        'PBB Cron, boleto ' .
-                        absint($boleto['id']) .
-                        ': ' .
-                        $e->getMessage()
+                        'PBB Cron: erro no boleto '
+                        . absint($boleto['id'] ?? 0)
+                        . ': '
+                        . $e->getMessage()
                     );
                 }
             }
         } catch (Throwable $e) {
-            error_log('PBB Cron: ' . $e->getMessage());
+            error_log(
+                'PBB Cron: erro geral: '
+                . $e->getMessage()
+            );
         }
     }
 }

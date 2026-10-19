@@ -1,8 +1,9 @@
-⚠️ 3 pontos que ainda preciso te alertar
+⚠️ 3 pontos a corrigir no plugin
 
 1. Isso agora vai quebrar um link que passou despercebido no diagnóstico anterior
 
 Na tela admin (render_generate_page, listagem "Últimos boletos gerados"), a coluna "PDF" tem:
+
 <a href="<?php echo esc_url($boleto['pdf_url']); ?>" target="_blank" rel="noopener">Abrir PDF</a>
 
 Esse link aponta para a URL direta (pdf_url), não para o handler protegido. Com o .htaccess ativo, qualquer clique nesse link agora vai retornar 403, inclusive para você como admin. Corrija trocando esse link para passar pelo mesmo endpoint com token:
@@ -44,4 +45,4 @@ ____________________________________________________
 
 Se esse site (ou um cliente futuro que use este plugin) rodar em Nginx puro ou LiteSpeed sem emulação de .htaccess, essa regra não faz nada, e o silêncio é o problema: não há erro, o arquivo simplesmente fica público de novo sem aviso. Vale documentar isso claramente (ex.: no readme.txt do plugin) e, se possível, adicionar uma rotina de autoteste: na tela de configurações, fazer um wp_remote_get() interno para uma URL de teste dentro da pasta protegida e alertar o admin visualmente se o retorno não for 403/401.
 
-Teste rápido que eu faria agora, antes de considerar isso fechado: tente abrir a URL direta de um PDF já gerado (.../wp-content/uploads/banrisul-boletos/boleto-XXXX.pdf) no navegador — deve dar 403. Depois clique em "Abrir PDF" na tela admin — hoje vai dar 403 também (item 1 acima), e no shortcode público (que já usa o handler com token) deve continuar funcionando normalmente.
+Teste rápido, antes de considerar isso fechado: tente abrir a URL direta de um PDF já gerado (.../wp-content/uploads/banrisul-boletos/boleto-XXXX.pdf) no navegador — deve dar 403. Depois clique em "Abrir PDF" na tela admin — hoje vai dar 403 também (item 1 acima), e no shortcode público (que já usa o handler com token) deve continuar funcionando normalmente.

@@ -18,12 +18,13 @@ define('PBB_DIR', plugin_dir_path(__FILE__));
 define('PBB_URL', plugin_dir_url(__FILE__));
 define('PBB_VERSION', '0.1.0');
 
-require_once PBB_DIR . 'includes/class-pbb-cron.php';
 require_once PBB_DIR . 'includes/class-pbb-activator.php';
+require_once PBB_DIR . 'includes/class-pbb-empresas-config.php';
 require_once PBB_DIR . 'includes/class-pbb-admin.php';
 require_once PBB_DIR . 'includes/class-pbb-propovoice-api.php';
 require_once PBB_DIR . 'includes/class-pbb-banrisul-api.php';
 require_once PBB_DIR . 'includes/class-pbb-boletos-repository.php';
+require_once PBB_DIR . 'includes/class-pbb-cron.php';
 
 register_activation_hook(__FILE__, ['PBB_Activator', 'activate']);
 
