@@ -637,7 +637,7 @@ class PBB_Admin
                                 <input
                                     type="text"
                                     name="multa_percentual"
-                                    value="4,0"
+                                    value="2,0"
                                     size="6"
                                     inputmode="decimal"
                                 >
