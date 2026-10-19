@@ -107,7 +107,7 @@ class PBB_Banrisul_API
         $url = $this->base_url . '/boletos/' . rawurlencode($codigo_barras) . '/emitir?tipo_id=CODIGO_BARRAS';
 
         $response = wp_remote_get($url, [
-            'timeout' => 45,
+            'timeout' => 120,
             'headers' => [
                 'Authorization' => 'Bearer ' . $token,
                 'Accept' => 'application/json',

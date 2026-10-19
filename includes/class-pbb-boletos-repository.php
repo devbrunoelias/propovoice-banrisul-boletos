@@ -43,14 +43,67 @@ class PBB_Boletos_Repository
             'situacao_banrisul' => sanitize_text_field((string)($data['situacao_banrisul'] ?? '')),
             'situacao_cip' => sanitize_text_field((string)($data['situacao_cip'] ?? '')),
             'situacao_pagamento' => sanitize_text_field((string)($data['situacao_pagamento'] ?? '')),
-            'pdf_path' => sanitize_text_field((string)($data['pdf_path'] ?? '')),
-            'pdf_url' => esc_url_raw((string)($data['pdf_url'] ?? '')),
             'status_local' => sanitize_text_field((string)($data['status_local'] ?? 'criado')),
             'payload_registro' => $this->json_or_null($data['payload_registro'] ?? null),
             'payload_emissao' => $this->json_or_null($data['payload_emissao'] ?? null),
-            'payload_consulta' => $this->json_or_null($data['payload_consulta'] ?? null),
             'updated_at' => current_time('mysql'),
         ];
+
+        if (!empty($data['pdf_path'])) {
+            $row['pdf_path'] = sanitize_text_field(
+                (string)$data['pdf_path']
+            );
+        }
+
+        if (!empty($data['pdf_url'])) {
+            $row['pdf_url'] = esc_url_raw(
+                (string)$data['pdf_url']
+            );
+        }
+
+        if (
+            isset($data['payload_consulta'])
+            && $data['payload_consulta'] !== ''
+            && $data['payload_consulta'] !== null
+        ) {
+            $row['payload_consulta'] = $this->json_or_null(
+                $data['payload_consulta']
+            );
+        }
+
+        if (!empty($data['data_pagamento'])) {
+            $row['data_pagamento'] = sanitize_text_field(
+                (string)$data['data_pagamento']
+            );
+        }
+
+        if (!empty($data['data_credito'])) {
+            $row['data_credito'] = sanitize_text_field(
+                (string)$data['data_credito']
+            );
+        }
+
+        if (
+            isset($data['valor_pagamento'])
+            && $data['valor_pagamento'] !== ''
+        ) {
+            $row['valor_pagamento'] = (float)$data['valor_pagamento'];
+        }
+
+        if (
+            isset($data['valor_cobrado'])
+            && $data['valor_cobrado'] !== ''
+        ) {
+            $row['valor_cobrado'] = (float)$data['valor_cobrado'];
+        }
+
+        if (
+            isset($data['valor_creditado_debitado'])
+            && $data['valor_creditado_debitado'] !== ''
+        ) {
+            $row['valor_creditado_debitado'] =
+                (float)$data['valor_creditado_debitado'];
+        }
 
         if ($existing) {
             $updated = $wpdb->update(
@@ -128,14 +181,54 @@ class PBB_Boletos_Repository
         global $wpdb;
 
         $titulo = $consulta['titulo'] ?? [];
+        $operacoes = is_array($titulo['operacoes'] ?? null)
+            ? $titulo['operacoes']
+            : []; 
 
         $row = [
             'situacao_banrisul' => sanitize_text_field((string)($titulo['situacao_banrisul'] ?? '')),
             'situacao_cip' => sanitize_text_field((string)($titulo['situacao_cip'] ?? '')),
-            'situacao_pagamento' => sanitize_text_field((string)($titulo['situacao_pagamento'] ?? '')),
+            'situacao_pagamento' => sanitize_text_field(
+                (string) ($titulo['situacao_pagamento'] ?? '')
+                ),
+
             'payload_consulta' => $this->json_or_null($consulta),
             'updated_at' => current_time('mysql'),
         ];
+
+            if (!empty($operacoes['data_pagamento'])) {
+                $row['data_pagamento'] = sanitize_text_field(
+                    (string)$operacoes['data_pagamento']
+                );
+            }
+
+            if (!empty($operacoes['data_credito'])) {
+                $row['data_credito'] = sanitize_text_field(
+                    (string)$operacoes['data_credito']
+                );
+            }
+
+            if (
+                isset($operacoes['valor_pagamento'])
+                && $operacoes['valor_pagamento'] !== ''
+            ) {
+                $row['valor_pagamento'] = (float)$operacoes['valor_pagamento'];
+            }
+
+            if (
+                isset($operacoes['valor_cobrado'])
+                && $operacoes['valor_cobrado'] !== ''
+            ) {
+                $row['valor_cobrado'] = (float)$operacoes['valor_cobrado'];
+            }
+
+            if (
+                isset($operacoes['valor_creditado_debitado'])
+                && $operacoes['valor_creditado_debitado'] !== ''
+            ) {
+                $row['valor_creditado_debitado'] =
+                    (float)$operacoes['valor_creditado_debitado'];
+            }
 
             if (($titulo['situacao_banrisul'] ?? '') === 'L') {
                 $row['status_local'] = 'pago';

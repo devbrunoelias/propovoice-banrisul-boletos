@@ -85,6 +85,60 @@ class PBB_Admin
                 <p><strong>Valor:</strong> R$ <?php echo esc_html($boleto['valor_nominal'] ?? ''); ?></p>
                 <p><strong>Vencimento:</strong> <?php echo esc_html($boleto['data_vencimento'] ?? ''); ?></p>
                 <p><strong>Status:</strong> <?php echo esc_html(self::format_status($status_raw)); ?></p>
+                <?php if ($status_raw === 'pago') : ?>
+                <div
+                    style="
+                        margin: 16px 0;
+                        padding: 14px;
+                        border: 1px solid #b7dfc5;
+                        border-radius: 6px;
+                        background: #f0fff4;
+                    "
+                >
+                    <p style="margin-top: 0;">
+                        <strong>Pagamento identificado</strong>
+                    </p>
+
+                    <?php if (!empty($boleto['data_pagamento'])) : ?>
+                        <p>
+                            <strong>Data do pagamento:</strong>
+                            <?php
+                            echo esc_html(
+                                self::format_date_display(
+                                    $boleto['data_pagamento']
+                                )
+                            );
+                            ?>
+                        </p>
+                    <?php endif; ?>
+
+                    <?php if (!empty($boleto['valor_pagamento'])) : ?>
+                        <p>
+                            <strong>Valor pago:</strong>
+                            <?php
+                            echo esc_html(
+                                self::format_money_display(
+                                    $boleto['valor_pagamento']
+                                )
+                            );
+                            ?>
+                        </p>
+                    <?php endif; ?>
+
+                    <?php if (!empty($boleto['data_credito'])) : ?>
+                        <p>
+                            <strong>Data do crédito:</strong>
+                            <?php
+                            echo esc_html(
+                                self::format_date_display(
+                                    $boleto['data_credito']
+                                )
+                            );
+                            ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
 
                 <hr>
 
@@ -138,6 +192,7 @@ class PBB_Admin
         }
 
         self::render_notice();
+        self::render_environment_notice();
 
         $ambiente = get_option('pbb_banrisul_ambiente', 'sandbox');
         $base_url = get_option('pbb_banrisul_base_url', 'https://apidev.banrisul.com.br/cobranca/v1');
@@ -304,6 +359,7 @@ class PBB_Admin
         }
 
         self::render_notice();
+        self::render_environment_notice();
 
         $repo = new PBB_Boletos_Repository();
         $boletos = $repo->list_recent(20);
@@ -345,11 +401,12 @@ class PBB_Admin
                         <th>Link público</th>
                         <th>Consultar status</th>
                         <th>Status</th>
+                        <th>Pagamento</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($boletos)) : ?>
-                        <tr><td colspan="10">Nenhum boleto gerado ainda.</td></tr>
+                        <tr><td colspan="11">Nenhum boleto gerado ainda.</td></tr>
                     <?php else : ?>
                         <?php foreach ($boletos as $boleto) : ?>
                             <?php
@@ -406,6 +463,36 @@ class PBB_Admin
                                         self::format_status((string) ($boleto['status_local'] ?? ''))
                                     ); ?>
                                 </td>
+                                <td>
+                                    <?php if (($boleto['status_local'] ?? '') === 'pago') : ?>
+
+                                        <?php if (!empty($boleto['data_pagamento'])) : ?>
+                                            <strong>Pago em:</strong><br>
+                                            <?php
+                                            echo esc_html(
+                                                self::format_date_display(
+                                                    $boleto['data_pagamento']
+                                                )
+                                            );
+                                            ?>
+                                            <br>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($boleto['valor_pagamento'])) : ?>
+                                            <strong>Valor:</strong><br>
+                                            <?php
+                                            echo esc_html(
+                                                self::format_money_display(
+                                                    $boleto['valor_pagamento']
+                                                )
+                                            );
+                                            ?>
+                                        <?php endif; ?>
+
+                                    <?php else : ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -434,7 +521,30 @@ class PBB_Admin
             $propovoice = new PBB_Propovoice_API();
             $banrisul = new PBB_Banrisul_API();
             $repo = new PBB_Boletos_Repository();
+            $ambiente = get_option(
+                'pbb_banrisul_ambiente',
+                'sandbox'
+            );
 
+            $boleto_existente = $repo->get_by_invoice_id($invoice_id);
+
+            if (
+                $ambiente === 'producao'
+                && !empty($boleto_existente['codigo_barras'])
+            ) {
+                self::set_notice(
+                    'Já existe um boleto registrado para esta invoice. ' .
+                    'Use o botão Consultar status ou abra o boleto existente.',
+                    'error'
+                );
+
+                wp_safe_redirect(
+                    admin_url('admin.php?page=pbb-generate')
+                );
+
+                exit;
+            }
+            
             $invoices_response = $propovoice->list_invoices();
             $invoice = self::find_invoice_by_id($invoices_response, $invoice_id);
 
@@ -762,6 +872,33 @@ class PBB_Admin
         ];
     }
 
+    private static function format_date_display(?string $date): string
+    {
+    if (empty($date)) {
+        return '';
+    }
+
+    $date_object = DateTimeImmutable::createFromFormat(
+        '!Y-m-d',
+        $date
+    );
+
+    if (!$date_object) {
+        return '';
+    }
+
+    return $date_object->format('d/m/Y');
+    }
+
+    private static function format_money_display($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return 'R$ ' . number_format_i18n((float)$value, 2);
+    }
+
     private static function format_status(string $status): string
     {
     $labels = [
@@ -777,6 +914,36 @@ class PBB_Admin
     return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 
+    private static function render_environment_notice(): void
+    {
+        $ambiente = get_option(
+            'pbb_banrisul_ambiente',
+            'sandbox'
+        );
+
+        if ($ambiente === 'producao') {
+            ?>
+            <div class="notice notice-error">
+                <p>
+                    <strong>AMBIENTE DE PRODUÇÃO ATIVO.</strong>
+                    As operações realizadas nesta tela podem registrar
+                    cobranças bancárias reais.
+                </p>
+            </div>
+            <?php
+
+            return;
+        }
+
+        ?>
+        <div class="notice notice-info">
+            <p>
+                <strong>Ambiente Sandbox ativo.</strong>
+                As operações utilizam os cenários de teste do Banrisul.
+            </p>
+        </div>
+        <?php
+    }
 
     private static function set_notice(string $message, string $type = 'success'): void
     {
