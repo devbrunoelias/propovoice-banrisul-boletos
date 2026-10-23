@@ -172,6 +172,28 @@ class PBB_Admin
                 <p><strong>Cliente:</strong> <?php echo esc_html($boleto['client_name'] ?? ''); ?></p>
                 <p><strong>Valor:</strong> R$ <?php echo esc_html($boleto['valor_nominal'] ?? ''); ?></p>
                 <p><strong>Vencimento:</strong> <?php echo esc_html($boleto['data_vencimento'] ?? ''); ?></p>
+                <?php
+                    $status_nao_pago = in_array(
+                        $status_raw,
+                        [
+                            'baixado',
+                            'baixado_por_devolucao',
+                            'baixado por devolução',
+                            'boleto_baixado',
+                            'boleto baixado',
+                            'devolvido',
+                            'cancelado',
+                            'rejeitado',
+                            'rejeitado_cip',
+                            'rejeitado cip',
+                            'erro_registro',
+                            'erro_emissao',
+                            'vencido',
+                            'vencido_nao_pago',
+                        ],
+                        true
+                    );
+                    ?>
                 <p><strong>Status:</strong> <?php echo esc_html(self::format_status($status_raw)); ?></p>
                 <?php if ($status_raw === 'pago') : ?>
                 <div
@@ -226,6 +248,62 @@ class PBB_Admin
                         </p>
                     <?php endif; ?>
                 </div>
+
+                <?php elseif ($status_nao_pago) : ?>
+
+                    <div
+                        style="
+                            margin: 16px 0;
+                            padding: 14px;
+                            border: 1px solid #f1aeb5;
+                            border-radius: 6px;
+                            background: #f8d7da;
+                            color: #842029;
+                        "
+                    >
+                        <p style="margin: 0;">
+                            <strong>Boleto não pago</strong>
+                        </p>
+
+                        <p style="margin-bottom: 0;">
+                            <?php
+                            echo esc_html(
+                                self::format_status($status_raw)
+                            );
+                            ?>
+                        </p>
+                    </div>
+
+                <?php elseif (
+                    in_array(
+                        $status_raw,
+                        [
+                            'em_processo_de_devolucao_automatica',
+                            'em processo de devolução automática',
+                        ],
+                        true
+                    )
+                ) : ?>
+
+                    <div
+                        style="
+                            margin: 16px 0;
+                            padding: 14px;
+                            border: 1px solid #ffecb5;
+                            border-radius: 6px;
+                            background: #fff3cd;
+                            color: #664d03;
+                        "
+                    >
+                        <p style="margin: 0;">
+                            <strong>Atenção</strong>
+                        </p>
+
+                        <p style="margin-bottom: 0;">
+                            O boleto está em processo de devolução automática.
+                        </p>
+                    </div>
+
                 <?php endif; ?>
 
                 <hr>
@@ -725,15 +803,47 @@ class PBB_Admin
 
             <h2>Últimos boletos gerados</h2>
 
-             <style>
+            <style>
+                /*
+                * Pago: linha verde.
+                */
                 .widefat tr.pbb-boleto-pago > td {
                     background-color: #d7f0dc !important;
+                    color: #0f5132;
                     border-top-color: #9dccaa;
                     border-bottom-color: #9dccaa;
                 }
 
                 .widefat tr.pbb-boleto-pago > td:first-child {
                     border-left: 4px solid #008a20;
+                }
+
+                /*
+                * Recusado, baixado ou não pago: linha vermelha.
+                */
+                .widefat tr.pbb-boleto-nao-pago > td {
+                    background-color: #f8d7da !important;
+                    color: #842029;
+                    border-top-color: #f1aeb5;
+                    border-bottom-color: #f1aeb5;
+                }
+
+                .widefat tr.pbb-boleto-nao-pago > td:first-child {
+                    border-left: 4px solid #dc3545;
+                }
+
+                /*
+                * Estado intermediário: linha amarela.
+                */
+                .widefat tr.pbb-boleto-atencao > td {
+                    background-color: #fff3cd !important;
+                    color: #664d03;
+                    border-top-color: #ffecb5;
+                    border-bottom-color: #ffecb5;
+                }
+
+                .widefat tr.pbb-boleto-atencao > td:first-child {
+                    border-left: 4px solid #ffc107;
                 }
             </style>
                    
@@ -844,11 +954,59 @@ class PBB_Admin
                                 );
                             }
 
-                            $row_class = (
-                                ($boleto['status_local'] ?? '') === 'pago'
-                            )
-                                ? 'pbb-boleto-pago'
-                                : '';
+                            $status_raw = (string) ($boleto['status_local'] ?? '');
+
+                            $status_normalizado = strtolower(
+                                remove_accents(
+                                    str_replace('_', ' ', trim($status_raw))
+                                )
+                            );
+
+                            $status_nao_pago = [
+                                'baixado',
+                                'boleto baixado',
+                                'baixado por devolucao',
+                                'devolvido',
+                                'cancelado',
+                                'recusado',
+                                'rejeitado',
+                                'rejeitado cip',
+                                'nao pago',
+                                'erro registro',
+                                'erro emissao',
+                                'vencido',
+                                'vencido nao pago',
+                            ];
+
+                            $status_atencao = [
+                                'em processo de devolucao automatica',
+                                'processo de devolucao automatica',
+                            ];
+
+                            $row_class = '';
+
+                            if (
+                                in_array(
+                                    $status_normalizado,
+                                    [
+                                        'pago',
+                                        'liquidado',
+                                        'pagamento identificado',
+                                    ],
+                                    true
+                                )
+                            ) {
+                                $row_class = 'pbb-boleto-pago';
+                            } elseif (
+                                in_array($status_normalizado, $status_atencao, true)
+                            ) {
+                                $row_class = 'pbb-boleto-atencao';
+                            } elseif (
+                                in_array($status_normalizado, $status_nao_pago, true)
+                            ) {
+                                $row_class = 'pbb-boleto-nao-pago';
+                            }
+
                             ?>
                             <tr class="<?php echo esc_attr($row_class); ?>">
                                 <td><?php echo esc_html($boleto['propovoice_invoice_num']); ?></td>
