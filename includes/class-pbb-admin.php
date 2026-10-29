@@ -18,7 +18,9 @@ class PBB_Admin
         add_action('admin_post_pbb_upload_nfe', [self::class, 'handle_upload_nfe']);
         add_action('admin_post_pbb_download_nfe', [self::class, 'handle_download_nfe']);
         add_action('admin_post_nopriv_pbb_download_nfe', [self::class, 'handle_download_nfe']);
+        add_filter('the_content', [__CLASS__, 'disable_wpautop_for_public_boleto'], 9);
         add_action('init', [__CLASS__, 'register_shortcodes']);
+        add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue_public_assets']);
     }
 
     public static function register_menu(): void
@@ -52,314 +54,283 @@ class PBB_Admin
         );
     }
 
+    public static function disable_wpautop_for_public_boleto(
+        string $content
+    ): string {
+        if (
+            has_shortcode(
+                $content,
+                'banrisul_boleto'
+            )
+        ) {
+            remove_filter(
+                'the_content',
+                'wpautop'
+            );
+
+            remove_filter(
+                'the_content',
+                'shortcode_unautop'
+            );
+        }
+
+        return $content;
+    }
+
     public static function register_shortcodes(): void
     {
         add_shortcode('banrisul_boleto', [__CLASS__, 'render_boleto_shortcode']);
     }
 
-    public static function render_boleto_shortcode($atts = []): string
+    public static function enqueue_public_assets(): void
     {
-        $invoice_id = isset($_GET['invoice_id']) ? absint($_GET['invoice_id']) : 0;
-        $token = isset($_GET['token']) ? sanitize_text_field(wp_unslash($_GET['token'])) : '';
-
-        $empresa_nome = '';
-
-        $empresa_id_boleto = sanitize_key(
-            (string)($boleto['empresa_id'] ?? '')
-        );
-
-        if (
-            $empresa_id_boleto !== ''
-            && PBB_Empresas_Config::exists(
-                $empresa_id_boleto
-            )
-        ) {
-            $empresa_config = PBB_Empresas_Config::get(
-                $empresa_id_boleto
-            );
-
-            $empresa_nome = (string)(
-                $empresa_config['nome'] ?? ''
-            );
+        if (!is_singular()) {
+            return;
         }
 
-        if (!$invoice_id || !$token) {
-            return '<div class="banrisul-boleto"><p>Boleto não localizado. Parâmetros ausentes.</p></div>';
+        global $post;
+
+        if (!($post instanceof WP_Post)
+             || !has_shortcode((string) $post->post_content, 'banrisul_boleto')) {
+            return;
+        }
+
+        $plugin_root = trailingslashit(dirname(__DIR__));
+
+        $css_relative = 'assets/css/pbb-public-modern.css';
+        $js_relative = 'assets/js/pbb-public-modern.js';
+
+        $css_path = $plugin_root . $css_relative;
+        $js_path = $plugin_root . $js_relative;
+
+        wp_enqueue_style(
+            'pbb-public-modern',
+            PBB_URL . $css_relative,
+            [],
+            is_file($css_path)
+                ? (string) filemtime($css_path)
+                : '15.0.0'
+        );
+
+        wp_enqueue_script(
+            'pbb-public-modern',
+            PBB_URL . $js_relative,
+            [],
+            is_file($js_path)
+                ? (string) filemtime($js_path)
+                : '15.0.0',
+            true
+        );
+    }
+
+    public static function render_boleto_shortcode(
+        $atts = []
+    ): string {
+        $invoice_id = isset($_GET['invoice_id'])
+            ? absint($_GET['invoice_id'])
+            : 0;
+
+        $token = isset($_GET['token'])
+            ? sanitize_text_field(
+                wp_unslash($_GET['token'])
+            )
+            : '';
+
+        if (!$invoice_id || $token === '') {
+            return (
+                '<div class="banrisul-boleto">'
+                . '<p>Boleto não localizado. '
+                . 'Parâmetros ausentes.</p>'
+                . '</div>'
+            );
         }
 
         try {
+            /*
+             * Busca o boleto somente depois de validar
+             * os parâmetros básicos.
+             */
             $repo = new PBB_Boletos_Repository();
-            $boleto = $repo->get_by_invoice_id($invoice_id);
+
+            $boleto = $repo->get_by_invoice_id(
+                $invoice_id
+            );
 
             if (!$boleto) {
-                return '<div class="banrisul-boleto"><p>Boleto não encontrado para esta invoice.</p></div>';
+                return (
+                    '<div class="banrisul-boleto">'
+                    . '<p>Boleto não encontrado para esta invoice.</p>'
+                    . '</div>'
+                );
             }
 
-            if (empty($boleto['propovoice_invoice_token']) || !hash_equals((string) $boleto['propovoice_invoice_token'], $token)) {
-                return '<div class="banrisul-boleto"><p>Token inválido para acessar este boleto.</p></div>';
+            /*
+             * Mantém a proteção atual por token.
+             */
+            $token_salvo = (string) (
+                $boleto['propovoice_invoice_token']
+                ?? ''
+            );
+
+            if (
+                $token_salvo === ''
+                || !hash_equals(
+                    $token_salvo,
+                    $token
+                )
+            ) {
+                return (
+                    '<div class="banrisul-boleto">'
+                    . '<p>Token inválido para acessar este boleto.</p>'
+                    . '</div>'
+                );
             }
 
-            $logo_url = PBB_URL
+            /*
+             * Identifica a empresa emissora depois que
+             * o boleto já foi carregado.
+             */
+            $empresa_nome = '';
+
+            $empresa_id_boleto = sanitize_key(
+                (string) (
+                    $boleto['empresa_id']
+                    ?? ''
+                )
+            );
+
+            if (
+                $empresa_id_boleto !== ''
+                && PBB_Empresas_Config::exists(
+                    $empresa_id_boleto
+                )
+            ) {
+                $empresa_config =
+                    PBB_Empresas_Config::get(
+                        $empresa_id_boleto
+                    );
+
+                $empresa_nome = (string) (
+                    $empresa_config['nome']
+                    ?? ''
+                );
+            }
+
+            if ($empresa_nome === '') {
+                $empresa_nome = 'Empresa emissora';
+            }
+
+            /*
+             * Posteriormente poderemos escolher um logo
+             * diferente para cada empresa.
+             */
+            $empresa_logo_url = PBB_URL
                 . 'assets/images/logo-catania-studio.png';
 
+            /*
+             * Link protegido da nota fiscal.
+             */
             $nfe_url = '';
 
             if (
                 !empty($boleto['nfe_pdf_path'])
-                && !empty($boleto['propovoice_invoice_id'])
-                && !empty($boleto['propovoice_invoice_token'])
+                && !empty(
+                    $boleto['propovoice_invoice_id']
+                )
+                && $token_salvo !== ''
             ) {
                 $nfe_url = add_query_arg(
                     [
                         'action' => 'pbb_download_nfe',
                         'invoice_id' => absint(
-                            $boleto['propovoice_invoice_id']
+                            $boleto[
+                                'propovoice_invoice_id'
+                            ]
                         ),
-                        'token' => (string)(
-                            $boleto['propovoice_invoice_token']
-                        ),
+                        'token' => $token_salvo,
                     ],
                     admin_url('admin-post.php')
                 );
             }
 
+            /*
+             * Link protegido do boleto.
+             */
             $pdf_url = '';
 
-            if (!empty($boleto['pdf_path'])) {
+            if (
+                !empty($boleto['pdf_path'])
+                && !empty(
+                    $boleto['propovoice_invoice_id']
+                )
+                && $token_salvo !== ''
+            ) {
                 $pdf_url = add_query_arg(
                     [
                         'action' => 'pbb_download_boleto',
                         'invoice_id' => absint(
-                            $boleto['propovoice_invoice_id']
+                            $boleto[
+                                'propovoice_invoice_id'
+                            ]
                         ),
-                        'token' => (string)(
-                            $boleto['propovoice_invoice_token'] ?? ''
-                        ),
+                        'token' => $token_salvo,
                     ],
                     admin_url('admin-post.php')
                 );
             }
 
-            $status_raw = (string)($boleto['status_local'] ?? '');
+            $status_raw = (string) (
+                $boleto['status_local']
+                ?? ''
+            );
+
+            /*
+             * Carrega o novo layout.
+             */
+            $template_path = trailingslashit(
+                dirname(__DIR__)
+            ) . 'templates/public-boleto-modern.php';
+
+            if (!is_file($template_path)) {
+                return (
+                    '<div class="banrisul-boleto">'
+                    . '<p>O layout público não foi encontrado.</p>'
+                    . '</div>'
+                );
+            }
 
             ob_start();
-            ?>
-            <div class="banrisul-boleto" style="max-width: 760px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
-                <img src="<?php echo esc_url($logo_url); ?>" alt="Logo da empresa"
-                    loading="eager"
-                    fetchpriority="high"
-                    decoding="async"
-                    style="
-                        display: block;
-                        width: 100%;
-                        max-width: 240px;
-                        height: auto;
-                        margin: 0 auto 24px;
-                    "
-                    >
-            
-                <h2 style="margin-top: 0;">Documento(s) para pagamento</h2>
-                <p>
-                    Consulte abaixo documento(s) referente à sua cobrança.
-                </p>
 
-                <p><strong>Invoice:</strong> <?php echo esc_html($boleto['propovoice_invoice_num'] ?? ''); ?></p>
+            require $template_path;
 
-                <?php if ($empresa_nome !== '') : ?>
-                    <p><strong>Empresa emissora:</strong><?php echo esc_html($empresa_nome); ?></p>
-                <?php endif; ?>
+            $html = (string) ob_get_clean();
 
-                <p><strong>Cliente:</strong> <?php echo esc_html($boleto['client_name'] ?? ''); ?></p>
-                <p><strong>Valor:</strong> R$ <?php echo esc_html($boleto['valor_nominal'] ?? ''); ?></p>
-                <p><strong>Vencimento:</strong> <?php echo esc_html($boleto['data_vencimento'] ?? ''); ?></p>
-                <?php
-                    $status_nao_pago = in_array(
-                        $status_raw,
-                        [
-                            'baixado',
-                            'baixado_por_devolucao',
-                            'baixado por devolução',
-                            'boleto_baixado',
-                            'boleto baixado',
-                            'devolvido',
-                            'cancelado',
-                            'rejeitado',
-                            'rejeitado_cip',
-                            'rejeitado cip',
-                            'erro_registro',
-                            'erro_emissao',
-                            'vencido',
-                            'vencido_nao_pago',
-                        ],
-                        true
-                    );
-                    ?>
-                <p><strong>Status:</strong> <?php echo esc_html(self::format_status($status_raw)); ?></p>
-                <?php if ($status_raw === 'pago') : ?>
-                <div
-                    style="
-                        margin: 16px 0;
-                        padding: 14px;
-                        border: 1px solid #b7dfc5;
-                        border-radius: 6px;
-                        background: #f0fff4;
-                    "
-                >
-                    <p style="margin-top: 0;">
-                        <strong>Pagamento identificado</strong>
-                    </p>
+            /*
+            * Remove espaços e quebras entre tags.
+            *
+            * Isso reduz a possibilidade de outro formatador interpretar
+            * as quebras do template como parágrafos.
+            */
+            $html = preg_replace(
+                '/>\s+</',
+                '><',
+                $html
+            );
 
-                    <?php if (!empty($boleto['data_pagamento'])) : ?>
-                        <p>
-                            <strong>Data do pagamento:</strong>
-                            <?php
-                            echo esc_html(
-                                self::format_date_display(
-                                    $boleto['data_pagamento']
-                                )
-                            );
-                        ?>
-                        </p>
-                    <?php endif; ?>
+            if (!is_string($html)) {
+                return '';
+            }
 
-                    <?php if (!empty($boleto['valor_pagamento'])) : ?>
-                        <p>
-                            <strong>Valor pago:</strong>
-                            <?php
-                        echo esc_html(
-                            self::format_money_display(
-                                $boleto['valor_pagamento']
-                            )
-                        );
-                        ?>
-                        </p>
-                    <?php endif; ?>
+            return $html;
 
-                    <?php if (!empty($boleto['data_credito'])) : ?>
-                        <p>
-                            <strong>Data do crédito:</strong>
-                            <?php
-                        echo esc_html(
-                            self::format_date_display(
-                                $boleto['data_credito']
-                            )
-                        );
-                        ?>
-                        </p>
-                    <?php endif; ?>
-                </div>
-
-                <?php elseif ($status_nao_pago) : ?>
-
-                    <div
-                        style="
-                            margin: 16px 0;
-                            padding: 14px;
-                            border: 1px solid #f1aeb5;
-                            border-radius: 6px;
-                            background: #f8d7da;
-                            color: #842029;
-                        "
-                    >
-                        <p style="margin: 0;">
-                            <strong>Boleto não pago</strong>
-                        </p>
-
-                        <p style="margin-bottom: 0;">
-                            <?php
-                            echo esc_html(
-                                self::format_status($status_raw)
-                            );
-                            ?>
-                        </p>
-                    </div>
-
-                <?php elseif (
-                    in_array(
-                        $status_raw,
-                        [
-                            'em_processo_de_devolucao_automatica',
-                            'em processo de devolução automática',
-                        ],
-                        true
-                    )
-                ) : ?>
-
-                    <div
-                        style="
-                            margin: 16px 0;
-                            padding: 14px;
-                            border: 1px solid #ffecb5;
-                            border-radius: 6px;
-                            background: #fff3cd;
-                            color: #664d03;
-                        "
-                    >
-                        <p style="margin: 0;">
-                            <strong>Atenção</strong>
-                        </p>
-
-                        <p style="margin-bottom: 0;">
-                            O boleto está em processo de devolução automática.
-                        </p>
-                    </div>
-
-                <?php endif; ?>
-
-                <hr>
-
-                <p><strong>Linha digitável:</strong></p>
-
-                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <input
-                        type="text"
-                        id="banrisul-linha-digitavel"
-                        value="<?php echo esc_attr($boleto['linha_digitavel'] ?? ''); ?>"
-                        readonly
-                        style="flex: 1; min-width: 280px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
-                    >
-
-                    <button
-                        type="button"
-                        onclick="navigator.clipboard.writeText(document.getElementById('banrisul-linha-digitavel').value); alert('Linha digitável copiada!');"
-                        style="padding: 10px 14px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; cursor: pointer;"
-                    >
-                        Copiar
-                    </button>
-                </div>
-
-                <?php if ($pdf_url !== '') : ?>
-                    <p style="margin-top: 20px;">
-                        <a href="<?php echo esc_url($pdf_url); ?>" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #111827; color: #fff; text-decoration: none;">
-                            Abrir PDF do boleto
-                        </a>
-                    </p>
-                <?php else : ?>
-                    <p style="margin-top: 20px;">PDF ainda não disponível para este boleto.</p>
-                <?php endif; ?>
-
-                <?php if ($nfe_url !== '') : ?>
-                    <p style="margin-top: 12px;">
-                        <a href="<?php echo esc_url($nfe_url); ?>"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style="display: inline-block; padding: 10px 14px; border-radius: 6px; background: #047857; color: #fff; text-decoration: none;"
-                        >
-                            Abrir nota fiscal
-                        </a>
-                    </p>    
-                <?php endif; ?>
-
-                <?php if ($status_raw === 'boleto_sandbox_pdf_exemplo') : ?>
-                    <p style="margin-top: 16px; color: #92400e; background: #fffbeb; padding: 10px; border-radius: 6px;">
-                        Ambiente sandbox: o PDF exibido é um boleto exemplo do Banrisul.
-                    </p>
-                <?php endif; ?>
-            </div>
-            <?php
-            return ob_get_clean();
         } catch (Throwable $e) {
-            return '<div class="banrisul-boleto"><p>Erro ao carregar boleto: ' . esc_html($e->getMessage()) . '</p></div>';
+            return (
+                '<div class="banrisul-boleto">'
+                . '<p>Erro ao carregar boleto: '
+                . esc_html($e->getMessage())
+                . '</p>'
+                . '</div>'
+            );
         }
     }
 
@@ -627,7 +598,7 @@ class PBB_Admin
         self::render_environment_notice();
 
         $repo = new PBB_Boletos_Repository();
-        
+
         $per_page = 20;
 
         $pbb_paged = isset($_GET['pbb_paged'])
@@ -1050,7 +1021,7 @@ class PBB_Admin
                                                 echo esc_html(
                                                     $boleto['nfe_pdf_nome']
                                                 );
-                                                ?>
+                                            ?>
                                             </small>
                                         <?php endif; ?>
 
@@ -1090,10 +1061,10 @@ class PBB_Admin
                                             type="hidden"
                                             name="boleto_id"
                                             value="<?php
-                                                echo esc_attr(
-                                                    absint($boleto['id'] ?? 0)
-                                                );
-                                            ?>"
+                                            echo esc_attr(
+                                                absint($boleto['id'] ?? 0)
+                                            );
+                            ?>"
                                         >
 
                                         <?php
@@ -1101,7 +1072,7 @@ class PBB_Admin
                                             'pbb_upload_nfe_'
                                             . absint($boleto['id'] ?? 0)
                                         );
-                                        ?>
+                            ?>
 
                                         <input
                                             type="file"
@@ -1116,10 +1087,10 @@ class PBB_Admin
                                                 class="button button-secondary"
                                             >
                                                 <?php
-                                                echo !empty($boleto['nfe_pdf_path'])
-                                                    ? 'Substituir NFe'
-                                                    : 'Anexar NFe';
-                                                ?>
+                                    echo !empty($boleto['nfe_pdf_path'])
+                                        ? 'Substituir NFe'
+                                        : 'Anexar NFe';
+                            ?>
                                             </button>
                                         </p>
 
@@ -1158,22 +1129,22 @@ class PBB_Admin
                                         $boleto['status_local'] ?? ''
                                     );
 
-                                    $pode_alterar_vencimento = (
-                                        !empty($boleto['id'])
-                                        && !empty($boleto['codigo_barras'])
-                                        && (string) ($boleto['situacao_pagamento'] ?? '') !== '2'
-                                        && !in_array(
-                                            $status_local,
-                                            [
-                                                'pago',
-                                                'pagamento_identificado',
-                                                'baixado',
-                                                'rejeitado_cip',
-                                            ],
-                                            true
-                                        )
-                                    );
-                                    ?>
+                            $pode_alterar_vencimento = (
+                                !empty($boleto['id'])
+                                && !empty($boleto['codigo_barras'])
+                                && (string) ($boleto['situacao_pagamento'] ?? '') !== '2'
+                                && !in_array(
+                                    $status_local,
+                                    [
+                                        'pago',
+                                        'pagamento_identificado',
+                                        'baixado',
+                                        'rejeitado_cip',
+                                    ],
+                                    true
+                                )
+                            );
+                            ?>
 
                                     <?php if ($pode_alterar_vencimento) : ?>
                                         
@@ -1186,11 +1157,11 @@ class PBB_Admin
                                             );"
                                         >
                                             <?php
-                                            wp_nonce_field(
-                                                'pbb_alterar_vencimento_'
-                                                . absint($boleto['id'])
-                                            );
-                                            ?>
+                                    wp_nonce_field(
+                                        'pbb_alterar_vencimento_'
+                                        . absint($boleto['id'])
+                                    );
+                                        ?>
 
                                             <input
                                                 type="hidden"
@@ -1202,27 +1173,27 @@ class PBB_Admin
                                                 type="hidden"
                                                 name="boleto_id"
                                                 value="<?php
-                                                    echo esc_attr(
-                                                        absint($boleto['id'])
-                                                    );
-                                                ?>"
+                                                echo esc_attr(
+                                                    absint($boleto['id'])
+                                                );
+                                        ?>"
                                             >
 
                                             <input
                                                 type="date"
                                                 name="nova_data_vencimento"
                                                 value="<?php
-                                                    echo esc_attr(
-                                                        (string) (
-                                                            $boleto['data_vencimento'] ?? ''
-                                                        )
-                                                    );
-                                                ?>"
+                                            echo esc_attr(
+                                                (string) (
+                                                    $boleto['data_vencimento'] ?? ''
+                                                )
+                                            );
+                                        ?>"
                                                 min="<?php
-                                                    echo esc_attr(
-                                                        current_time('Y-m-d')
-                                                    );
-                                                ?>"
+                                            echo esc_attr(
+                                                current_time('Y-m-d')
+                                            );
+                                        ?>"
                                                 required
                                                 style="width: 150px; margin-bottom: 5px;"
                                             >
@@ -1302,7 +1273,7 @@ class PBB_Admin
                                     number_format_i18n($total_boletos)
                                 )
                             );
-                            ?>
+                ?>
                         </span>
 
                         <?php
@@ -1314,20 +1285,20 @@ class PBB_Admin
                             admin_url('admin.php')
                         );
 
-                        echo wp_kses_post(
-                            paginate_links(
-                                [
-                                    'base' => $base_url,
-                                    'format' => '',
-                                    'current' => $pbb_paged,
-                                    'total' => $total_paginas,
-                                    'prev_text' => '‹ Anterior',
-                                    'next_text' => 'Próxima ›',
-                                    'type' => 'list',
-                                ]
-                            )
-                        );
-                        ?>
+                echo wp_kses_post(
+                    paginate_links(
+                        [
+                            'base' => $base_url,
+                            'format' => '',
+                            'current' => $pbb_paged,
+                            'total' => $total_paginas,
+                            'prev_text' => '‹ Anterior',
+                            'next_text' => 'Próxima ›',
+                            'type' => 'list',
+                        ]
+                    )
+                );
+                ?>
                     </div>
                 </div>
             <?php endif; ?>
@@ -1911,15 +1882,15 @@ class PBB_Admin
                 . ':'
                 . $e->getLine(),
                 'error'
-                );
-            }
-
-            wp_safe_redirect(
-                admin_url('admin.php?page=pbb-generate')
             );
+        }
 
-            exit;
-        }    
+        wp_safe_redirect(
+            admin_url('admin.php?page=pbb-generate')
+        );
+
+        exit;
+    }
 
     public static function handle_consultar_status(): void
     {
