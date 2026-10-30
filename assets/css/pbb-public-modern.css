@@ -590,6 +590,10 @@
     gap: 10px;
 }
 
+#pbb-v15-help {
+    scroll-margin-top: 16px;
+}
+
 .pbb-v15__main-document {
     display: grid !important;
     width: 100% !important;
@@ -656,6 +660,84 @@
     margin-top: 1px;
     font-size: 9px;
     font-weight: 400;
+}
+
+/*
+ * Ajuda contextual dos documentos.
+ */
+.pbb-v15__document-help {
+    display: grid;
+    min-height: 48px;
+    padding: 9px 12px;
+
+    grid-template-columns:
+        25px
+        minmax(0, 1fr)
+        auto;
+
+    align-items: center;
+    gap: 9px;
+
+    border:
+        1px solid #b2d3fb;
+
+    border-radius: 7px;
+
+    color:
+        var(--pbb-blue-dark);
+
+    background: #eef6ff;
+}
+
+.pbb-v15__document-help > svg {
+    width: 22px;
+    height: 22px;
+
+    color:
+        var(--pbb-blue);
+}
+
+.pbb-v15__document-help > div {
+    min-width: 0;
+}
+
+.pbb-v15__document-help strong,
+.pbb-v15__document-help span {
+    display: block;
+}
+
+.pbb-v15__document-help strong {
+    font-size: 11px;
+}
+
+.pbb-v15__document-help span {
+    margin-top: 2px;
+
+    color:
+        var(--pbb-muted);
+
+    font-size: 9px;
+    line-height: 1.35;
+}
+
+.pbb-v15__document-help a {
+    display: inline-flex;
+
+    align-items: center;
+    gap: 4px;
+
+    color:
+        var(--pbb-blue);
+
+    font-size: 10px;
+    font-weight: 750;
+
+    white-space: nowrap;
+}
+
+.pbb-v15__document-help a svg {
+    width: 14px;
+    height: 14px;
 }
 
 /*
@@ -900,11 +982,22 @@ button[aria-expanded="true"] svg {
 }
 
 .pbb-v15__faq-answer {
-    padding: 0 9px 8px;
+    margin-top: 7px !important;
+    padding: 0 10px 10px !important;
+
     color: var(--pbb-muted);
     background: #ffffff;
-    font-size: 8px;
-    line-height: 1.4;
+
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.pbb-v15__faq-item
+button[aria-expanded="true"] {
+    border-bottom: 1px solid rgba(9, 103, 235, 0.12) !important;
+
+    color: var(--pbb-blue) !important;
+    background: var(--pbb-blue-soft) !important;
 }
 
 /*
@@ -1241,9 +1334,39 @@ button[aria-expanded="true"] svg {
         background: transparent !important;
     }
 
+    .pbb-v15__faq-answer {
+    margin-top: 7px !important;
+    padding: 0 10px 11px !important;
+    line-height: 1.5 !important;
+    }
+
     .pbb-v15__footer {
         padding-top: 18px;
         padding-bottom: 24px;
+    }
+
+    .pbb-v15__document-help {
+        grid-template-columns:
+            24px
+            minmax(0, 1fr);
+
+        padding: 10px 11px;
+    }
+
+    .pbb-v15__document-help a {
+        grid-column: 1 / -1;
+
+        justify-self: stretch;
+        justify-content: center;
+
+        min-height: 36px;
+        margin-top: 3px;
+        padding: 7px 10px;
+
+        border:
+            1px solid var(--pbb-blue);
+
+        border-radius: 6px;
     }
 }
 
@@ -2217,8 +2340,10 @@ button[aria-expanded="true"] svg {
     }
 
     .pbb-v15__faq-answer {
-        padding: 0 10px 9px !important;
-        font-size: 9px !important;
+        margin-top: 7px !important;
+        padding: 0 10px 10px !important;
+        font-size: 10px !important;
+        line-height: 1.5 !important;
     }
 
     /*
@@ -2320,7 +2445,7 @@ button[aria-expanded="true"] svg {
 }
 
 /*
- * O fundo claro fica somente atrás da imagem.
+ * Logotipos brancos com fundo transparente.
  */
 .pbb-v15__brand img {
     display: block !important;
@@ -2330,18 +2455,13 @@ button[aria-expanded="true"] svg {
     max-height: 58px !important;
 
     margin: 0 !important;
-    padding: 7px 12px !important;
+    padding: 0 !important;
 
-    border:
-        1px solid rgba(255, 255, 255, 0.68);
+    border: 0 !important;
+    border-radius: 0 !important;
 
-    border-radius: 8px;
-
-    background:
-        rgba(255, 255, 255, 0.94);
-
-    box-shadow:
-        0 3px 12px rgba(5, 24, 43, 0.13);
+    background: transparent !important;
+    box-shadow: none !important;
 
     object-fit: contain !important;
 }
@@ -2436,25 +2556,6 @@ body.pbb-public-document
 }
 
 /*
- * Cápsula visual dos logotipos.
- */
-.pbb-v15__brand img {
-    max-width: 250px !important;
-    max-height: 56px !important;
-
-    padding: 5px 11px !important;
-
-    border: 0 !important;
-    border-radius: 7px !important;
-
-    background:
-        rgba(248, 249, 250, 0.90) !important;
-
-    box-shadow:
-        0 2px 8px rgba(8, 25, 43, 0.10) !important;
-}
-
-/*
  * Remove espaço externo deixado pelo tema ou construtor.
  */
 html.pbb-public-document,
@@ -2542,31 +2643,23 @@ body.pbb-public-document
     }
 
     .pbb-v15__brand img {
-        display: block !important;
+    display: block !important;
 
-        width: auto !important;
-        max-width: 190px !important;
-        max-height: 52px !important;
+    width: auto !important;
+    max-width: 190px !important;
+    max-height: 52px !important;
 
-        margin: 0 !important;
-        padding: 5px 9px !important;
+    margin: 0 !important;
+    padding: 0 !important;
 
-        border: 0 !important;
-        border-radius: 7px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
 
-        background:
-            rgba(248, 249, 250, 0.92) !important;
+    background: transparent !important;
+    box-shadow: none !important;
 
-        box-shadow:
-            0 2px 7px rgba(
-                8,
-                25,
-                43,
-                0.10
-            ) !important;
-
-        object-fit: contain !important;
-    }
+    object-fit: contain !important;
+}
 
     /*
      * Ambiente seguro do cabeçalho.
@@ -2942,7 +3035,7 @@ body.pbb-public-document
         max-width: 155px !important;
         max-height: 47px !important;
 
-        padding: 4px 7px !important;
+        padding: 0 !important;
     }
 
     .pbb-v15__header-security {

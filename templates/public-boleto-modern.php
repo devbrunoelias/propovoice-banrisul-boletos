@@ -25,6 +25,15 @@ $empresa_logo_url = isset($empresa_logo_url)
     ? (string) $empresa_logo_url
     : '';
 
+/*
+ * Logo colorido utilizado somente no rodapé.
+ */
+$empresa_footer_logo_url = defined('PBB_URL')
+    ? PBB_URL
+        . 'assets/images/'
+        . 'logo-catania-spweb-colorido.png'
+    : $empresa_logo_url;    
+
 $status_raw = isset($status_raw)
     ? (string) $status_raw
     : (string) ($boleto['status_local'] ?? '');
@@ -815,7 +824,7 @@ $status_icon = $status_pago
 
                             <span>
                                 <strong>
-                                    Abrir nota fiscal
+                                    Abrir PDF da nota fiscal
                                 </strong>
 
                                 <small>
@@ -841,6 +850,27 @@ $status_icon = $status_pago
                             </span>
                         </div>
                     <?php endif; ?>
+                </div>
+
+                <div class="pbb-v15__document-help">
+                    <?php echo $icon('help'); ?>
+
+                    <div>
+                        <strong>
+                            Não conseguiu abrir um documento?
+                        </strong>
+
+                        <span>
+                            Consulte “Precisa de ajuda?” nesta página.
+                            As orientações resolvem os problemas
+                            mais comuns de navegador e acesso.
+                        </span>
+                    </div>
+
+                    <a href="#pbb-v15-help">
+                        Ver soluções
+                        <?php echo $icon('chevron'); ?>
+                    </a>
                 </div>
 
                 <div class="pbb-v15__summary">
@@ -934,12 +964,14 @@ $status_icon = $status_pago
 
                     <div>
                         <strong>
-                            Dúvidas sobre esta cobrança?
+                            Ainda precisa de ajuda?
                         </strong>
 
                         <span>
-                            Entre em contato pelos canais
-                            habituais de atendimento.
+                            Se as orientações da seção “Precisa de ajuda?”
+                            não resolverem, entre em contato pelos canais
+                            habituais de atendimento e informe o número
+                            <?php echo esc_html($invoice_num); ?>.
                         </span>
                     </div>
                 </div>
@@ -1023,7 +1055,7 @@ $status_icon = $status_pago
                     </div>
                 </div>
 
-                <div class="pbb-v15__side-card pbb-v15__help">
+                <div id="pbb-v15-help" class="pbb-v15__side-card pbb-v15__help">
                     <div class="pbb-v15__side-heading">
                         <span>
                             <?php echo $icon('help'); ?>
@@ -1041,12 +1073,61 @@ $status_icon = $status_pago
                     <?php
                     $faq_items = [
                         [
+                            'id' => 'pbb-v15-faq-token',
+                            'question' => (
+                                'O que significa acesso protegido por token?'
+                            ),
+                            'answer' => (
+                                'O token é uma chave exclusiva incluída no endereço '
+                                . 'desta página. Ele permite consultar os documentos '
+                                . 'sem informar usuário e senha. Não encaminhe este '
+                                . 'link para terceiros e não publique o endereço.'
+                            ),
+                        ],
+                        [
+                            'id' => 'pbb-v15-faq-link',
+                            'question' => (
+                                'O link não abriu. O que devo fazer?'
+                            ),
+                            'answer' => (
+                                'Confirme se o endereço foi copiado por completo, '
+                                . 'incluindo todos os caracteres após “token=”. '
+                                . 'Abra o link novamente diretamente da mensagem '
+                                . 'recebida, sem editar ou remover partes do endereço.'
+                            ),
+                        ],
+                        [
+                            'id' => 'pbb-v15-faq-browser',
+                            'question' => (
+                                'A página ou o documento não carregou corretamente'
+                            ),
+                            'answer' => (
+                                'Atualize a página e tente novamente. Se o problema '
+                                . 'continuar, abra o link em uma janela anônima ou '
+                                . 'privativa. Você também pode testar outro navegador '
+                                . 'atualizado, como Chrome, Edge, Firefox ou Safari.'
+                            ),
+                        ],
+                        [
+                            'id' => 'pbb-v15-faq-blocked',
+                            'question' => (
+                                'Cliquei no documento e nada aconteceu'
+                            ),
+                            'answer' => (
+                                'O navegador pode ter bloqueado a abertura de uma '
+                                . 'nova guia ou o download. Verifique o aviso de '
+                                . 'pop-up bloqueado próximo à barra de endereços, '
+                                . 'permita a abertura para este site e tente novamente.'
+                            ),
+                        ],
+                        [
                             'id' => 'pbb-v15-faq-payment',
                             'question' => 'Como faço o pagamento?',
                             'answer' => (
-                                'Copie a linha digitável e utilize '
-                                . 'o aplicativo ou internet banking '
-                                . 'da instituição financeira.'
+                                'Abra o PDF do boleto ou copie a linha digitável. '
+                                . 'Antes de confirmar o pagamento, confira o valor, '
+                                . 'a data de vencimento e o nome do beneficiário '
+                                . 'exibido pela instituição financeira.'
                             ),
                         ],
                         [
@@ -1055,9 +1136,10 @@ $status_icon = $status_pago
                                 'O que fazer se o boleto estiver vencido?'
                             ),
                             'answer' => (
-                                'Entre em contato com a empresa '
-                                . 'emissora para verificar uma '
-                                . 'possível atualização.'
+                                'Verifique se sua instituição financeira atualiza '
+                                . 'automaticamente os valores. Se o pagamento não '
+                                . 'for aceito, entre em contato com a Catânia '
+                                . 'e solicite um novo boleto para pagamento.'
                             ),
                         ],
                         [
@@ -1066,18 +1148,21 @@ $status_icon = $status_pago
                                 'Onde encontro a nota fiscal?'
                             ),
                             'answer' => (
-                                'Quando anexada, a nota fiscal '
-                                . 'fica disponível nesta página.'
+                                'Quando disponível, a nota fiscal pode ser aberta '
+                                . 'pelo botão “Abrir PDF da nota fiscal”. Se o documento '
+                                . 'estiver indicado como não anexado, aguarde sua '
+                                . 'disponibilização ou entre em contato.'
                             ),
                         ],
                         [
                             'id' => 'pbb-v15-faq-confirmation',
                             'question' => (
-                                'Como confirmar o pagamento?'
+                                'Como posso confirmar o pagamento?'
                             ),
                             'answer' => (
-                                'O status será atualizado quando '
-                                . 'o pagamento for identificado.'
+                                'A identificação bancária pode não ser imediata. '
+                                . 'Guarde o comprovante. O status desta página será '
+                                . 'atualizado assim que o pagamento for processado.'
                             ),
                         ],
                     ];
@@ -1146,14 +1231,19 @@ $status_icon = $status_pago
 
     <footer class="pbb-v15__footer">
         <div class="pbb-v15__footer-brand">
-            <?php if ($empresa_logo_url !== '') : ?>
+            <?php
+            if (
+                $empresa_footer_logo_url !== ''
+            ) :
+                ?>
                 <img
                     src="<?php
                         echo esc_url(
-                            $empresa_logo_url
+                            $empresa_footer_logo_url
                         );
                     ?>"
                     alt="Catânia e SPWEB"
+                    loading="lazy"
                 >
             <?php endif; ?>
 

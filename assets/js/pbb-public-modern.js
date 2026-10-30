@@ -244,68 +244,52 @@
     }
 
     /**
-     * Fecha uma resposta do FAQ.
-     */
-    function closeAccordion(button) {
-        var contentId = button.getAttribute(
-            'aria-controls'
-        );
+ * Fecha uma resposta do FAQ.
+ */
+function closeAccordion(button) {
+    var contentId = button.getAttribute(
+        'aria-controls'
+    );
 
-        var content = document.getElementById(
-            contentId
-        );
+    var content = document.getElementById(
+        contentId
+    );
 
-        var icon = button.querySelector(
-            'span:last-child'
-        );
+    button.setAttribute(
+        'aria-expanded',
+        'false'
+    );
 
-        button.setAttribute(
-            'aria-expanded',
-            'false'
-        );
-
-        if (content) {
-            content.hidden = true;
-        }
-
-        if (icon) {
-            icon.textContent = '+';
-        }
+    if (content) {
+        content.hidden = true;
     }
+}
 
-    /**
-     * Abre uma resposta do FAQ.
-     */
+/**
+ * Abre uma resposta do FAQ.
+ */
     function openAccordion(button) {
-        var contentId = button.getAttribute(
-            'aria-controls'
-        );
+    var contentId = button.getAttribute(
+        'aria-controls'
+    );
 
-        var content = document.getElementById(
-            contentId
-        );
+    var content = document.getElementById(
+        contentId
+    );
 
-        var icon = button.querySelector(
-            'span:last-child'
-        );
+    button.setAttribute(
+        'aria-expanded',
+        'true'
+    );
 
-        button.setAttribute(
-            'aria-expanded',
-            'true'
-        );
-
-        if (content) {
-            content.hidden = false;
-        }
-
-        if (icon) {
-            icon.textContent = '−';
-        }
+    if (content) {
+        content.hidden = false;
     }
+}
 
-    /**
-     * Mantém somente uma resposta aberta por vez.
-     */
+/**
+ * Mantém somente uma resposta aberta por vez.
+ */
     function handleAccordion(button) {
         var isExpanded = (
             button.getAttribute(
