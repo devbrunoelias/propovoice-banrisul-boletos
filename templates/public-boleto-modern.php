@@ -876,7 +876,7 @@ echo esc_html(
                 <?php endif; ?>
 
                 Após esse prazo, entre em contato com a
-                Catânia Studio para solicitar um novo boleto.
+                Catânia Studio para solicitar um novo boleto atualizado.
             </span>
         </div>
     </div>
