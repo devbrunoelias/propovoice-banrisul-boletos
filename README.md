@@ -97,8 +97,8 @@ propovoice-banrisul-boletos/
 │   │   └── pbb-public-modern.css
 │   ├── images/
 │   │   ├── README.md
-│   │   ├── logo-catania-studio.png
-│   │   └── logo-catania-spweb-colorido.png
+│   │   ├── logo-catania-studio.png         ← adicionar manualmente
+│   │   └── logo-catania-spweb-colorido.png ← adicionar manualmente
 │   └── js/
 │       └── pbb-public-modern.js
 ├── docs/
@@ -110,7 +110,7 @@ propovoice-banrisul-boletos/
 │   ├── class-pbb-cron.php
 │   ├── class-pbb-empresas-config.php
 │   ├── class-pbb-propovoice-api.php
-|   └── class-pbb-webhook.php
+│   └── class-pbb-webhook.php
 ├── templates/
 │   └── public-boleto-modern.php
 ├── LICENSE
