@@ -32,7 +32,7 @@ $empresa_footer_logo_url = defined('PBB_URL')
     ? PBB_URL
         . 'assets/images/'
         . 'logo-catania-spweb-colorido.png'
-    : $empresa_logo_url;    
+    : $empresa_logo_url;
 
 $status_raw = isset($status_raw)
     ? (string) $status_raw
@@ -222,6 +222,47 @@ $valor_nominal = (float) (
     ?? 0
 );
 
+$baixa_dias = absint(
+    $boleto['baixa_dias']
+    ?? 0
+);
+
+$data_limite_pagamento = '';
+
+if (
+    $baixa_dias > 0
+    && preg_match(
+        '/^\d{4}-\d{2}-\d{2}$/',
+        $data_vencimento
+    ) === 1
+) {
+    $data_vencimento_objeto =
+        DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $data_vencimento
+        );
+
+    if (
+        $data_vencimento_objeto
+            instanceof DateTimeImmutable
+        && $data_vencimento_objeto->format(
+            'Y-m-d'
+        ) === $data_vencimento
+    ) {
+        $data_limite_objeto =
+            $data_vencimento_objeto->modify(
+                '+'
+                . $baixa_dias
+                . ' days'
+            );
+
+        $data_limite_pagamento =
+            $data_limite_objeto->format(
+                'd/m/Y'
+            );
+    }
+}
+
 $data_vencimento = (string) (
     $boleto['data_vencimento']
     ?? ''
@@ -284,13 +325,47 @@ $formatar_data = static function (
         return 'Não informada';
     }
 
-    $timestamp = strtotime($data);
+    /*
+     * Datas no formato Y-m-d representam datas civis,
+     * sem horário e sem conversão de fuso.
+     *
+     * Formatar diretamente evita que a meia-noite em UTC
+     * seja convertida para o dia anterior em Brasília.
+     */
+    if (
+        preg_match(
+            '/^\d{4}-\d{2}-\d{2}$/',
+            $data
+        ) === 1
+    ) {
+        $date = DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $data
+        );
 
-    if ($timestamp === false) {
+        if (
+            $date instanceof DateTimeImmutable
+            && $date->format('Y-m-d') === $data
+        ) {
+            return $date->format('d/m/Y');
+        }
+
         return $data;
     }
 
-    return wp_date('d/m/Y', $timestamp);
+    /*
+     * Para valores que realmente possuem horário,
+     * mantém a conversão usando o fuso do WordPress.
+     */
+    try {
+        $date = new DateTimeImmutable($data);
+
+        return $date
+            ->setTimezone(wp_timezone())
+            ->format('d/m/Y');
+    } catch (Exception $exception) {
+        return $data;
+    }
 };
 
 $formatar_documento = static function (
@@ -465,7 +540,7 @@ $status_icon = $status_pago
 <div
     class="pbb-v15 pbb-v15--<?php
         echo esc_attr($status_visual);
-    ?>"
+?>"
 >
     <header class="pbb-v15__header">
         <div class="pbb-v15__header-inner">
@@ -473,10 +548,10 @@ $status_icon = $status_pago
                 <?php if ($empresa_logo_url !== '') : ?>
                     <img
                         src="<?php
-                            echo esc_url(
-                                $empresa_logo_url
-                            );
-                        ?>"
+                        echo esc_url(
+                            $empresa_logo_url
+                        );
+                    ?>"
                         alt="Catânia e SPWEB"
                         loading="eager"
                         fetchpriority="high"
@@ -519,20 +594,20 @@ $status_icon = $status_pago
 
                                 <h1>
                                     <?php
-                                    echo esc_html($invoice_num);
-                                    ?>
+                                echo esc_html($invoice_num);
+?>
                                 </h1>
 
                                 <?php if ($data_emissao !== '') : ?>
                                     <small>
                                         Emitida em
                                         <?php
-                                        echo esc_html(
-                                            $formatar_data(
-                                                $data_emissao
-                                            )
-                                        );
-                                        ?>
+    echo esc_html(
+        $formatar_data(
+            $data_emissao
+        )
+    );
+                                    ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
@@ -544,23 +619,23 @@ $status_icon = $status_pago
                                 $status_icon,
                                 'pbb-v15__status-icon'
                             );
-                            ?>
+?>
 
                             <div>
                                 <strong>
                                     <?php
-                                    echo esc_html(
-                                        $status_titulo
-                                    );
-                                    ?>
+        echo esc_html(
+            $status_titulo
+        );
+?>
                                 </strong>
 
                                 <span>
                                     <?php
-                                    echo esc_html(
-                                        $status_exibicao
-                                    );
-                                    ?>
+echo esc_html(
+    $status_exibicao
+);
+?>
                                 </span>
                             </div>
                         </div>
@@ -575,10 +650,10 @@ $status_icon = $status_pago
 
                                 <strong>
                                     <?php
-                                    echo esc_html(
-                                        $cliente_nome
-                                    );
-                                    ?>
+echo esc_html(
+    $cliente_nome
+);
+?>
                                 </strong>
 
                                 <?php
@@ -593,7 +668,7 @@ $status_icon = $status_pago
                                                 $cliente_documento
                                             )
                                         );
-                                        ?>
+                                    ?>
                                     </small>
                                 <?php endif; ?>
                             </div>
@@ -611,7 +686,7 @@ $status_icon = $status_pago
                                     echo esc_html(
                                         $valor_formatado
                                     );
-                                    ?>
+?>
                                 </strong>
                             </div>
                         </div>
@@ -624,13 +699,34 @@ $status_icon = $status_pago
 
                                 <strong>
                                     <?php
+echo esc_html(
+    $formatar_data(
+        $data_vencimento
+    )
+);
+?>
+                                </strong>
+
+                                <?php if ($baixa_dias > 0) : ?>
+                                    <small class="pbb-v15__due-note">
+                                        Baixa automática após
+                                        <?php
+    echo esc_html(
+        (string) $baixa_dias
+    );
+                                    ?>
+                                        <?php
                                     echo esc_html(
-                                        $formatar_data(
-                                            $data_vencimento
+                                        _n(
+                                            'dia',
+                                            'dias',
+                                            $baixa_dias,
+                                            'propovoice-banrisul-boletos'
                                         )
                                     );
                                     ?>
-                                </strong>
+                                    </small>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -645,7 +741,7 @@ $status_icon = $status_pago
                                     echo esc_html(
                                         $empresa_nome
                                     );
-                                    ?>
+?>
                                 </strong>
                             </div>
                         </div>
@@ -659,23 +755,23 @@ $status_icon = $status_pago
                             $status_icon,
                             'pbb-v15__payment-icon'
                         );
-                        ?>
+?>
 
                         <div>
                             <h2>
                                 <?php
-                                echo esc_html(
-                                    $status_titulo
-                                );
-                                ?>
+        echo esc_html(
+            $status_titulo
+        );
+?>
                             </h2>
 
                             <p>
                                 <?php
-                                echo esc_html(
-                                    $status_descricao
-                                );
-                                ?>
+echo esc_html(
+    $status_descricao
+);
+?>
                             </p>
                         </div>
                     </div>
@@ -689,12 +785,12 @@ $status_icon = $status_pago
 
                                 <strong>
                                     <?php
-                                    echo esc_html(
-                                        $formatar_data(
-                                            $data_pagamento
-                                        )
-                                    );
-                                    ?>
+    echo esc_html(
+        $formatar_data(
+            $data_pagamento
+        )
+    );
+                        ?>
                                 </strong>
                             </div>
 
@@ -706,10 +802,10 @@ $status_icon = $status_pago
                                 <strong>
                                     R$
                                     <?php
-                                    echo esc_html(
-                                        $valor_pagamento_formatado
-                                    );
-                                    ?>
+                        echo esc_html(
+                            $valor_pagamento_formatado
+                        );
+                        ?>
                                 </strong>
                             </div>
 
@@ -720,17 +816,71 @@ $status_icon = $status_pago
 
                                 <strong>
                                     <?php
-                                    echo esc_html(
-                                        $formatar_data(
-                                            $data_credito
-                                        )
-                                    );
-                                    ?>
+                        echo esc_html(
+                            $formatar_data(
+                                $data_credito
+                            )
+                        );
+                        ?>
                                 </strong>
                             </div>
                         </div>
                     <?php endif; ?>
                 </div>
+
+<?php if (
+    $baixa_dias > 0
+    && !$status_pago
+    && !$status_nao_pago
+) : ?>
+    <div class="pbb-v15__payment-deadline">
+        <?php echo $icon('calendar'); ?>
+
+        <div>
+            <strong>
+                Prazo para pagamento
+            </strong>
+
+            <span>
+                Este boleto será baixado automaticamente
+                <?php
+                echo esc_html(
+                    (string) $baixa_dias
+                );
+    ?>
+                <?php
+                    echo esc_html(
+                        _n(
+                            'dia',
+                            'dias',
+                            $baixa_dias,
+                            'propovoice-banrisul-boletos'
+                        )
+                    );
+    ?>
+                após o vencimento.
+
+                <?php
+    if (
+        $data_limite_pagamento !== ''
+    ) :
+        ?>
+                    O pagamento deve ser realizado até
+                    <strong>
+                        <?php
+                        echo esc_html(
+                            $data_limite_pagamento
+                        );
+        ?>.
+                    </strong>
+                <?php endif; ?>
+
+                Após esse prazo, entre em contato com a
+                Catânia Studio para solicitar um novo boleto.
+            </span>
+        </div>
+    </div>
+<?php endif; ?>
 
                 <?php if ($mostrar_linha_digitavel) : ?>
                     <div class="pbb-v15__barcode">
@@ -754,10 +904,10 @@ $status_icon = $status_pago
                                 spellcheck="false"
                                 autocomplete="off"
                                 value="<?php
-                                    echo esc_attr(
-                                        $linha_digitavel
-                                    );
-                                ?>"
+                    echo esc_attr(
+                        $linha_digitavel
+                    );
+                    ?>"
                                 readonly
                                 inputmode="numeric"
                             >
@@ -789,8 +939,8 @@ $status_icon = $status_pago
                             class="pbb-v15__main-document
                                 pbb-v15__main-document--boleto"
                             href="<?php
-                                echo esc_url($pdf_url);
-                            ?>"
+                    echo esc_url($pdf_url);
+                        ?>"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
@@ -815,8 +965,8 @@ $status_icon = $status_pago
                             class="pbb-v15__main-document
                                 pbb-v15__main-document--nfe"
                             href="<?php
-                                echo esc_url($nfe_url);
-                            ?>"
+                            echo esc_url($nfe_url);
+                        ?>"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
@@ -885,11 +1035,11 @@ $status_icon = $status_pago
 
                             <dd>
                                 <?php
-                                echo esc_html(
-                                    $nosso_numero
-                                    ?: 'Não informado'
-                                );
-                                ?>
+                            echo esc_html(
+                                $nosso_numero
+                                ?: 'Não informado'
+                            );
+?>
                             </dd>
                         </div>
 
@@ -901,8 +1051,8 @@ $status_icon = $status_pago
 
                             <dd>
                                 <?php
-                                echo esc_html($especie);
-                                ?>
+echo esc_html($especie);
+?>
                                 - Outros
                             </dd>
                         </div>
@@ -915,8 +1065,8 @@ $status_icon = $status_pago
 
                             <dd>
                                 <?php
-                                echo esc_html($aceite);
-                                ?>
+echo esc_html($aceite);
+?>
                                 - Aceite
                             </dd>
                         </div>
@@ -937,7 +1087,7 @@ $status_icon = $status_pago
                                     echo esc_html(
                                         $beneficiario_codigo
                                     );
-                                    ?>
+                            ?>
                                 </dd>
                             </div>
                         <?php endif; ?>
@@ -953,7 +1103,7 @@ $status_icon = $status_pago
                                 echo esc_html(
                                     $empresa_nome
                                 );
-                                ?>
+?>
                             </dd>
                         </div>
                     </dl>
@@ -1011,8 +1161,8 @@ $status_icon = $status_pago
 
                             <a
                                 href="<?php
-                                    echo esc_url($pdf_url);
-                                ?>"
+    echo esc_url($pdf_url);
+                        ?>"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -1034,18 +1184,18 @@ $status_icon = $status_pago
 
                             <small>
                                 <?php
-                                echo $tem_nfe
-                                    ? 'Documento em PDF'
-                                    : 'Ainda não anexada';
-                                ?>
+                        echo $tem_nfe
+                            ? 'Documento em PDF'
+                            : 'Ainda não anexada';
+?>
                             </small>
                         </div>
 
                         <?php if ($tem_nfe) : ?>
                             <a
                                 href="<?php
-                                    echo esc_url($nfe_url);
-                                ?>"
+    echo esc_url($nfe_url);
+                            ?>"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -1087,37 +1237,20 @@ $status_icon = $status_pago
                         [
                             'id' => 'pbb-v15-faq-link',
                             'question' => (
-                                'O link não abriu. O que devo fazer?'
+                                'O PDF não abriu. O que devo fazer?'
                             ),
                             'answer' => (
-                                'Confirme se o endereço foi copiado por completo, '
-                                . 'incluindo todos os caracteres após “token=”. '
-                                . 'Abra o link novamente diretamente da mensagem '
-                                . 'recebida, sem editar ou remover partes do endereço.'
-                            ),
-                        ],
-                        [
-                            'id' => 'pbb-v15-faq-browser',
-                            'question' => (
-                                'A página ou o documento não carregou corretamente'
-                            ),
-                            'answer' => (
-                                'Atualize a página e tente novamente. Se o problema '
-                                . 'continuar, abra o link em uma janela anônima ou '
-                                . 'privativa. Você também pode testar outro navegador '
-                                . 'atualizado, como Chrome, Edge, Firefox ou Safari.'
-                            ),
-                        ],
-                        [
-                            'id' => 'pbb-v15-faq-blocked',
-                            'question' => (
-                                'Cliquei no documento e nada aconteceu'
-                            ),
-                            'answer' => (
-                                'O navegador pode ter bloqueado a abertura de uma '
-                                . 'nova guia ou o download. Verifique o aviso de '
-                                . 'pop-up bloqueado próximo à barra de endereços, '
-                                . 'permita a abertura para este site e tente novamente.'
+                                'Verifique a parte superior do navegador, próxima à '
+                                . 'barra de endereços. Procure um aviso ou ícone informando '
+                                . 'que uma nova guia, janela, pop-up ou download foi '
+                                . 'bloqueado. Se houver, abra esse aviso, permita a abertura '
+                                . 'para este site e tente acessar o documento novamente. '
+                                . 'Se o problema continuar, abra uma janela anônima ou '
+                                . 'privativa: no Google Chrome ou Microsoft Edge, pressione '
+                                . 'Ctrl + Shift + N, cole o link completo recebido na barra '
+                                . 'de endereços e pressione Enter. Você também pode abrir o '
+                                . 'menu de três pontos do navegador e selecionar “Nova janela '
+                                . 'anônima” ou “Nova janela InPrivate”.'
                             ),
                         ],
                         [
@@ -1125,9 +1258,12 @@ $status_icon = $status_pago
                             'question' => 'Como faço o pagamento?',
                             'answer' => (
                                 'Abra o PDF do boleto ou copie a linha digitável. '
-                                . 'Antes de confirmar o pagamento, confira o valor, '
-                                . 'a data de vencimento e o nome do beneficiário '
-                                . 'exibido pela instituição financeira.'
+                                . 'Antes de confirmar o pagamento, confira com atenção '
+                                . 'o valor, a data de vencimento e o nome do beneficiário '
+                                . 'informado pela instituição financeira. '
+                                . 'Caso tenha alguma dúvida, encontre uma informação '
+                                . 'diferente ou não consiga concluir o pagamento, fale '
+                                . 'com nossa equipe pelo WhatsApp (51) 99722-3209.'
                             ),
                         ],
                         [
@@ -1143,30 +1279,21 @@ $status_icon = $status_pago
                             ),
                         ],
                         [
-                            'id' => 'pbb-v15-faq-nfe',
-                            'question' => (
-                                'Onde encontro a nota fiscal?'
-                            ),
-                            'answer' => (
-                                'Quando disponível, a nota fiscal pode ser aberta '
-                                . 'pelo botão “Abrir PDF da nota fiscal”. Se o documento '
-                                . 'estiver indicado como não anexado, aguarde sua '
-                                . 'disponibilização ou entre em contato.'
-                            ),
-                        ],
-                        [
                             'id' => 'pbb-v15-faq-confirmation',
                             'question' => (
                                 'Como posso confirmar o pagamento?'
                             ),
                             'answer' => (
                                 'A identificação bancária pode não ser imediata. '
-                                . 'Guarde o comprovante. O status desta página será '
-                                . 'atualizado assim que o pagamento for processado.'
+                                . 'Guarde o comprovante de pagamento e consulte novamente '
+                                . 'esta mesma página. Nosso sistema verifica a situação '
+                                . 'do boleto em intervalos de até 30 minutos, e o status '
+                                . 'será atualizado quando o pagamento for identificado '
+                                . 'e processado pela instituição financeira.'
                             ),
                         ],
                     ];
-                    ?>
+?>
 
                     <div class="pbb-v15__faq-items">
                         <?php foreach ($faq_items as $item) : ?>
@@ -1175,18 +1302,18 @@ $status_icon = $status_pago
                                     type="button"
                                     aria-expanded="false"
                                     aria-controls="<?php
-                                        echo esc_attr(
-                                            $item['id']
-                                        );
-                                    ?>"
+                    echo esc_attr(
+                        $item['id']
+                    );
+                            ?>"
                                     data-pbb-accordion
                                 >
                                     <span>
                                         <?php
-                                        echo esc_html(
-                                            $item['question']
-                                        );
-                                        ?>
+                                echo esc_html(
+                                    $item['question']
+                                );
+                            ?>
                                     </span>
 
                                     <?php echo $icon('chevron'); ?>
@@ -1194,18 +1321,18 @@ $status_icon = $status_pago
 
                                 <div
                                     id="<?php
-                                        echo esc_attr(
-                                            $item['id']
-                                        );
-                                    ?>"
+                            echo esc_attr(
+                                $item['id']
+                            );
+                            ?>"
                                     class="pbb-v15__faq-answer"
                                     hidden
                                 >
                                     <?php
-                                    echo esc_html(
-                                        $item['answer']
-                                    );
-                                    ?>
+                            echo esc_html(
+                                $item['answer']
+                            );
+                            ?>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -1241,7 +1368,7 @@ $status_icon = $status_pago
                         echo esc_url(
                             $empresa_footer_logo_url
                         );
-                    ?>"
+                ?>"
                     alt="Catânia e SPWEB"
                     loading="lazy"
                 >
