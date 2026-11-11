@@ -91,14 +91,16 @@ A nota fiscal pode ser vinculada ao boleto correspondente.
 Quando disponível, o portal apresenta um botão para abertura ou download do documento. Quando não houver nota fiscal vinculada, o portal informa que o documento ainda não está disponível.
 
 # Estrutura principal do Plugin
+
+```text
 propovoice-banrisul-boletos/
 ├── assets/
 │   ├── css/
 │   │   └── pbb-public-modern.css
 │   ├── images/
 │   │   ├── README.md
-│   │   ├── logo-catania-studio.png         ← adicionar manualmente
-│   │   └── logo-catania-spweb-colorido.png ← adicionar manualmente
+│   │   ├── logo-catania-studio.png
+│   │   └── logo-catania-spweb-colorido.png
 │   └── js/
 │       └── pbb-public-modern.js
 ├── docs/
@@ -116,7 +118,11 @@ propovoice-banrisul-boletos/
 ├── LICENSE
 ├── README.md
 └── propovoice-banrisul-boletos.php
-A estrutura exata da pasta includes pode variar conforme a versão do plugin.
+```
+
+A estrutura exata da pasta `includes` pode variar conforme a versão do plugin.
+
+> **Observação:** os arquivos de logotipo não acompanham este repositório. Consulte `assets/images/README.md` para preparar as imagens utilizadas no cabeçalho e no rodapé.
 
 # Configuração dos logotipos
 
