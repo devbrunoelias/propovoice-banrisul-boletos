@@ -933,7 +933,13 @@ echo esc_html(
                     </div>
                 <?php endif; ?>
 
-                <div class="pbb-v15__main-documents">
+                <div
+                    class="pbb-v15__main-documents<?php
+                        echo $tem_nfe
+                            ? ''
+                            : ' pbb-v15__main-documents--single';
+                    ?>"
+                >
                     <?php if ($tem_boleto) : ?>
                         <a
                             class="pbb-v15__main-document
@@ -965,8 +971,8 @@ echo esc_html(
                             class="pbb-v15__main-document
                                 pbb-v15__main-document--nfe"
                             href="<?php
-                            echo esc_url($nfe_url);
-                        ?>"
+                                echo esc_url($nfe_url);
+                            ?>"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
@@ -984,21 +990,6 @@ echo esc_html(
 
                             <?php echo $icon('chevron'); ?>
                         </a>
-                    <?php else : ?>
-                        <div
-                            class="pbb-v15__main-document
-                                pbb-v15__main-document--disabled"
-                        >
-                            <?php echo $icon('file'); ?>
-
-                            <span>
-                                <strong>Nota fiscal</strong>
-
-                                <small>
-                                    Documento ainda não anexado
-                                </small>
-                            </span>
-                        </div>
                     <?php endif; ?>
                 </div>
 
@@ -1171,38 +1162,36 @@ echo esc_html($aceite);
                         </div>
                     <?php endif; ?>
 
-                    <div class="pbb-v15__side-document">
-                        <span
-                            class="pbb-v15__pdf-icon
-                                pbb-v15__pdf-icon--green"
-                        >
-                            NFe
-                        </span>
+                    <?php if ($tem_nfe) : ?>
+                        <div class="pbb-v15__side-document">
+                            <span
+                                class="pbb-v15__pdf-icon
+                                    pbb-v15__pdf-icon--green"
+                            >
+                                NFe
+                            </span>
 
-                        <div>
-                            <strong>Nota fiscal eletrônica</strong>
+                            <div>
+                                <strong>
+                                    Nota fiscal eletrônica
+                                </strong>
 
-                            <small>
-                                <?php
-                        echo $tem_nfe
-                            ? 'Documento em PDF'
-                            : 'Ainda não anexada';
-?>
-                            </small>
-                        </div>
+                                <small>
+                                    Documento em PDF
+                                </small>
+                            </div>
 
-                        <?php if ($tem_nfe) : ?>
                             <a
                                 href="<?php
-    echo esc_url($nfe_url);
-                            ?>"
+                                    echo esc_url($nfe_url);
+                                ?>"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
                                 Abrir
                             </a>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div id="pbb-v15-help" class="pbb-v15__side-card pbb-v15__help">

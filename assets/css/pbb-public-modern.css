@@ -664,6 +664,14 @@ span strong {
     gap: 10px;
 }
 
+/*
+ * Cobrança que disponibiliza somente o boleto.
+ */
+.pbb-v15__main-documents--single {
+    grid-template-columns:
+        minmax(0, 1fr) !important;
+}
+
 #pbb-v15-help {
     scroll-margin-top: 16px;
 }
@@ -1771,6 +1779,25 @@ button[aria-expanded="true"] {
         repeat(2, minmax(0, 1fr)) !important;
 
     gap: 10px !important;
+}
+
+/*
+ * Quando não houver NFe, o boleto ocupa
+ * toda a largura da área de documentos.
+ */
+.pbb-v15
+.pbb-v15__main-documents.pbb-v15__main-documents--single {
+    grid-template-columns:
+        minmax(0, 1fr) !important;
+}
+
+.pbb-v15
+.pbb-v15__main-documents.pbb-v15__main-documents--single
+> .pbb-v15__main-document {
+    grid-column: 1 / -1 !important;
+
+    width: 100% !important;
+    max-width: none !important;
 }
 
 .pbb-v15 a.pbb-v15__main-document,
